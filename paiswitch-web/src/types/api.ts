@@ -48,7 +48,7 @@ export interface CustomProviderCreateRequest {
   name: string
   description?: string
   baseUrl: string
-  modelName: string
+  modelName?: string
   modelNameSmall?: string
   iconUrl?: string
 }
@@ -127,4 +127,53 @@ export interface ConversationMessage {
 export interface ConversationHistoryResponse {
   sessionId?: string | null
   messages: ConversationMessage[]
+}
+
+export interface SkillSummary {
+  folderName: string
+  displayName: string
+  absolutePath: string
+  description?: string
+  status: 'valid' | 'invalid'
+  hasSkillMd: boolean
+  hasLicense: boolean
+  hasScripts: boolean
+  hasReferences: boolean
+  hasAssets: boolean
+  fileCount: number
+  sizeBytes: number
+  updatedAt: string
+  warnings: string[]
+}
+
+export interface SkillFileEntry {
+  relativePath: string
+  type: 'file' | 'directory'
+  sizeBytes: number
+  updatedAt: string
+}
+
+export interface SkillDetail extends SkillSummary {
+  skillMdContent?: string | null
+  frontmatter: Record<string, string>
+  files: SkillFileEntry[]
+}
+
+export interface TrashSkillEntry {
+  trashEntry: string
+  originalFolderName: string
+  absolutePath: string
+  deletedAt: string
+}
+
+export interface SkillListResponse {
+  rootPath: string
+  totalSkills: number
+  invalidSkills: number
+  trashedSkills: number
+  skills: SkillSummary[]
+}
+
+export interface RenameSkillRequest {
+  newFolderName: string
 }

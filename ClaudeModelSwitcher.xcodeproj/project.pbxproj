@@ -29,6 +29,14 @@
 		A1000012 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000012 /* SettingsView.swift */; };
 		A1000013 /* TrayMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000013 /* TrayMenuView.swift */; };
 		A1000014 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A2000014 /* Assets.xcassets */; };
+		CA100001 /* ClaudeSkillModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA200001 /* ClaudeSkillModels.swift */; };
+		CA100002 /* SkillManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA200002 /* SkillManager.swift */; };
+		CA100003 /* SkillsManagementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA200003 /* SkillsManagementView.swift */; };
+		CA100004 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA200004 /* AuthManager.swift */; };
+		CA100005 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA200005 /* APIClient.swift */; };
+		CA100006 /* PaiSwitchService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA200006 /* PaiSwitchService.swift */; };
+		CA100007 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA200007 /* LoginView.swift */; };
+		CA100008 /* AIChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA200008 /* AIChatView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -56,6 +64,14 @@
 		A2000014 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A3000001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A4000001 /* PaiSwitch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PaiSwitch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		CA200001 /* ClaudeSkillModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeSkillModels.swift; sourceTree = "<group>"; };
+		CA200002 /* SkillManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkillManager.swift; sourceTree = "<group>"; };
+		CA200003 /* SkillsManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkillsManagementView.swift; sourceTree = "<group>"; };
+		CA200004 /* AuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthManager.swift; sourceTree = "<group>"; };
+		CA200005 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
+		CA200006 /* PaiSwitchService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaiSwitchService.swift; sourceTree = "<group>"; };
+		CA200007 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		CA200008 /* AIChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIChatView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -110,6 +126,7 @@
 		A6000005 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				CA200001 /* ClaudeSkillModels.swift */,
 				673B90432F3CB48E0053FB49 /* CustomProviderConfiguration.swift */,
 				673B90442F3CB48E0053FB49 /* ModelConfiguration.swift */,
 				A2000003 /* ModelProvider.swift */,
@@ -121,11 +138,14 @@
 		A6000006 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				CA600001 /* Network */,
+				CA200004 /* AuthManager.swift */,
 				673B90472F3CB4A00053FB49 /* CustomProviderManager.swift */,
 				673B90412F3CB4560053FB49 /* MigrationManager.swift */,
 				A2000005 /* ConfigManager.swift */,
 				A2000006 /* KeychainManager.swift */,
 				A2000007 /* BackupManager.swift */,
+				CA200002 /* SkillManager.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -141,6 +161,9 @@
 		A6000008 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				CA200008 /* AIChatView.swift */,
+				CA200007 /* LoginView.swift */,
+				CA200003 /* SkillsManagementView.swift */,
 				673B904F2F3CB7E50053FB49 /* CustomProviderDetailView.swift */,
 				673B90492F3CB4B00053FB49 /* AddCustomProviderView.swift */,
 				673B904A2F3CB4B00053FB49 /* CustomProviderListView.swift */,
@@ -161,6 +184,15 @@
 				A2000014 /* Assets.xcassets */,
 			);
 			path = Resources;
+			sourceTree = "<group>";
+		};
+		CA600001 /* Network */ = {
+			isa = PBXGroup;
+			children = (
+				CA200005 /* APIClient.swift */,
+				CA200006 /* PaiSwitchService.swift */,
+			);
+			path = Network;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -240,13 +272,21 @@
 				A1000005 /* ConfigManager.swift in Sources */,
 				A1000006 /* KeychainManager.swift in Sources */,
 				A1000007 /* BackupManager.swift in Sources */,
+				CA100004 /* AuthManager.swift in Sources */,
 				673B90482F3CB4A00053FB49 /* CustomProviderManager.swift in Sources */,
+				CA100002 /* SkillManager.swift in Sources */,
+				CA100005 /* APIClient.swift in Sources */,
+				CA100006 /* PaiSwitchService.swift in Sources */,
 				673B90452F3CB48E0053FB49 /* CustomProviderConfiguration.swift in Sources */,
+				CA100001 /* ClaudeSkillModels.swift in Sources */,
 				673B904C2F3CB4B00053FB49 /* CustomProviderListView.swift in Sources */,
 				673B904D2F3CB4B00053FB49 /* AddCustomProviderView.swift in Sources */,
 				673B904E2F3CB4B00053FB49 /* ModelConfigurationView.swift in Sources */,
 				673B90462F3CB48E0053FB49 /* ModelConfiguration.swift in Sources */,
 				A1000008 /* MainViewModel.swift in Sources */,
+				CA100007 /* LoginView.swift in Sources */,
+				CA100008 /* AIChatView.swift in Sources */,
+				CA100003 /* SkillsManagementView.swift in Sources */,
 				A1000009 /* ProviderListView.swift in Sources */,
 				673B90502F3CB7E50053FB49 /* CustomProviderDetailView.swift in Sources */,
 				A1000010 /* ProviderDetailView.swift in Sources */,

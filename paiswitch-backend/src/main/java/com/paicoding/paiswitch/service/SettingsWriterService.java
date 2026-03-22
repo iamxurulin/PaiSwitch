@@ -72,10 +72,10 @@ public class SettingsWriterService {
                 env.put("ANTHROPIC_BASE_URL", provider.getBaseUrl());
 
                 // Set model names
-                if (provider.getModelName() != null) {
+                if (provider.getModelName() != null && !provider.getModelName().isBlank()) {
                     env.put("ANTHROPIC_MODEL", provider.getModelName());
                 }
-                if (provider.getModelNameSmall() != null) {
+                if (provider.getModelNameSmall() != null && !provider.getModelNameSmall().isBlank()) {
                     env.put("ANTHROPIC_SMALL_FAST_MODEL", provider.getModelNameSmall());
                 }
 

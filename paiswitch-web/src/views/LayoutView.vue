@@ -1,20 +1,28 @@
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useProviderStore } from '@/stores/provider'
 import { onMounted } from 'vue'
 import Toast from '@/components/Toast.vue'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 const providerStore = useProviderStore()
 
 const navItems = [
   { path: '/', name: 'Dashboard', label: '仪表盘', icon: '📊' },
   { path: '/providers', name: 'Providers', label: '模型管理', icon: '🔌' },
-  { path: '/config', name: 'Config', label: '配置', icon: '⚙️' },
+  { path: '/skills', name: 'Skills', label: 'Skills', icon: '🧠' },
   { path: '/ai-chat', name: 'AIChat', label: 'AI 助手', icon: '🤖' }
 ]
+
+const isActive = (path: string) => {
+  if (path === '/') {
+    return route.path === '/'
+  }
+  return route.path === path
+}
 
 onMounted(() => {
   providerStore.init()
@@ -27,46 +35,54 @@ function handleLogout() {
 </script>
 
 <template>
-  <div class="min-h-screen flex">
+  <div class="min-h-screen flex bg-[#fafafa]">
     <!-- Toast Notifications -->
     <Toast />
 
     <!-- Sidebar -->
-    <aside class="w-64 bg-white border-r border-gray-200">
-      <div class="p-4 border-b border-gray-200">
-        <h1 class="text-xl font-bold text-primary-600">PaiSwitch</h1>
+    <aside class="w-64 bg-gray-50 border-r border-gray-100">
+      <div class="px-6 py-8">
+        <h1 class="text-2xl font-bold tracking-tight text-gray-900">PaiSwitch</h1>
+        <p class="text-xs text-gray-500 mt-1 font-light">API Key Manager</p>
       </div>
 
-      <nav class="p-4 space-y-1">
-        <router-link
+      <nav class="px-4 space-y-2">
+        <a
           v-for="item in navItems"
           :key="item.path"
-          :to="item.path"
-          class="flex items-center gap-3 px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
-          active-class="bg-primary-50 text-primary-600"
+          @click="router.push(item.path)"
+          class="flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 cursor-pointer"
+          :class="[
+            isActive(item.path)
+              ? 'bg-white text-primary-600 font-medium shadow-sm'
+              : 'text-gray-600 hover:bg-white hover:text-gray-900 hover:shadow-sm'
+          ]"
         >
-          <span>{{ item.icon }}</span>
-          <span>{{ item.label }}</span>
-        </router-link>
+          <span class="text-lg">{{ item.icon }}</span>
+          <span class="text-[15px]">{{ item.label }}</span>
+        </a>
       </nav>
     </aside>
 
     <!-- Main Content -->
     <div class="flex-1 flex flex-col">
       <!-- Header -->
-      <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6">
-        <div class="text-gray-600">
-          当前模型:
-          <span v-if="providerStore.currentConfig" class="font-medium text-gray-900">
+      <header class="h-20 bg-white border-b border-gray-100 flex items-center justify-between px-8">
+        <div class="flex items-center gap-3">
+          <span class="text-sm text-gray-500 font-light">当前模型:</span>
+          <span v-if="providerStore.currentConfig" class="px-4 py-1.5 bg-gray-100 rounded-full text-sm font-medium text-gray-900">
             {{ providerStore.currentConfig.currentProvider.name }}
+          </span>
+          <span v-else class="px-4 py-1.5 bg-orange-50 text-orange-600 rounded-full text-sm font-medium">
+            未配置
           </span>
         </div>
 
-        <div class="flex items-center gap-4">
-          <span class="text-gray-600">{{ authStore.user?.username }}</span>
+        <div class="flex items-center gap-6">
+          <span class="text-sm text-gray-600 font-medium">{{ authStore.user?.username }}</span>
           <button
             @click="handleLogout"
-            class="text-gray-500 hover:text-gray-700 text-sm"
+            class="px-4 py-2 text-sm text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-all duration-200"
           >
             退出
           </button>
@@ -74,7 +90,7 @@ function handleLogout() {
       </header>
 
       <!-- Page Content -->
-      <main class="flex-1 p-6 overflow-auto">
+      <main class="flex-1 px-8 py-8 overflow-auto">
         <router-view />
       </main>
     </div>

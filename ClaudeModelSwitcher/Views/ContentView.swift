@@ -5,6 +5,7 @@ struct ContentView: View {
     @StateObject private var authManager = AuthManager.shared
     @State private var selectedProvider: ModelProvider?
     @State private var selectedCustomProvider: CustomProviderConfiguration?
+    @State private var showSkillsManagement = false
     @State private var showingAPIKeyInput = false
     @State private var inputAPIKey = ""
     @State private var showLoginSheet = false
@@ -68,16 +69,44 @@ struct ContentView: View {
                     }
                 }
 
+                Section {
+                    Button {
+                        showSkillsManagement = true
+                        selectedProvider = nil
+                        selectedCustomProvider = nil
+                    } label: {
+                        HStack {
+                            Image(systemName: "square.stack.3d.up")
+                                .foregroundColor(showSkillsManagement ? .accentColor : .secondary)
+                            VStack(alignment: .leading) {
+                                Text("Skills")
+                                Text("管理 ~/.claude/skills")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            if showSkillsManagement {
+                                Image(systemName: "checkmark")
+                                    .foregroundColor(.accentColor)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                } header: {
+                    Text("本地资源")
+                }
+
                 // Providers Section
                 Section {
                     ForEach(ModelProvider.allCases, id: \.self) { provider in
-                        ProviderRow(
+                        SidebarProviderRow(
                             provider: provider,
                             isSelected: viewModel.currentProvider == provider,
                             hasAPIKey: viewModel.hasAPIKey(for: provider)
                         )
                         .contentShape(Rectangle())
                         .onTapGesture {
+                            showSkillsManagement = false
                             selectedProvider = provider
                             selectedCustomProvider = nil
                         }
@@ -87,7 +116,7 @@ struct ContentView: View {
                 }
 
                 // Custom Providers Section
-                let customProviders = CustomProviderManager.shared.getAllProviders()
+                let customProviders = CustomProviderManager.shared.loadProviders()
                 if !customProviders.isEmpty {
                     Section {
                         ForEach(customProviders) { provider in
@@ -106,6 +135,7 @@ struct ContentView: View {
                             }
                             .contentShape(Rectangle())
                             .onTapGesture {
+                                showSkillsManagement = false
                                 selectedCustomProvider = provider
                                 selectedProvider = nil
                             }
@@ -117,7 +147,9 @@ struct ContentView: View {
             }
             .frame(minWidth: 200)
         } detail: {
-            if let customProvider = selectedCustomProvider {
+            if showSkillsManagement {
+                SkillsManagementView()
+            } else if let customProvider = selectedCustomProvider {
                 CustomProviderDetailView(
                     viewModel: viewModel,
                     provider: customProvider,
@@ -185,7 +217,7 @@ struct ContentView: View {
     }
 }
 
-struct ProviderRow: View {
+struct SidebarProviderRow: View {
     let provider: ModelProvider
     let isSelected: Bool
     let hasAPIKey: Bool
@@ -193,7 +225,7 @@ struct ProviderRow: View {
     var body: some View {
         HStack {
             VStack(alignment: .leading) {
-                Text(provider.displayName)
+                Text(provider.rawValue)
                 Text(provider.defaultModel)
                     .font(.caption)
                     .foregroundColor(.secondary)
@@ -294,9 +326,4 @@ struct ToastView: View {
             }
         }
     }
-}
-
-#Preview {
-    ContentView(viewModel: MainViewModel())
-        .frame(width: 800, height: 600)
 }

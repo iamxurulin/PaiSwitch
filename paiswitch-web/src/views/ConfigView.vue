@@ -1,13 +1,9 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
 import { useProviderStore } from '@/stores/provider'
 import { useToastStore } from '@/stores/toast'
-import type { BackupInfo } from '@/types'
 
 const providerStore = useProviderStore()
 const toastStore = useToastStore()
-
-const backups = computed(() => [] as BackupInfo[]) // TODO: fetch backups
 
 async function handleSwitch(providerCode: string) {
   const result = await providerStore.switchProvider(providerCode)
@@ -21,56 +17,63 @@ async function handleSwitch(providerCode: string) {
 
 <template>
   <div>
-    <h2 class="text-2xl font-bold text-gray-900 mb-6">配置管理</h2>
+    <div class="mb-10">
+      <h2 class="text-3xl font-bold tracking-tight text-gray-900">配置管理</h2>
+      <p class="text-gray-500 mt-2 font-light">查看当前配置和切换模型</p>
+    </div>
 
     <!-- Current Config -->
-    <div class="bg-white rounded-xl p-6 shadow-sm mb-6">
-      <h3 class="text-lg font-semibold text-gray-900 mb-4">当前配置</h3>
+    <div class="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm mb-6">
+      <h3 class="text-xl font-semibold text-gray-900 mb-6">当前配置</h3>
 
       <div v-if="providerStore.currentConfig" class="space-y-4">
-        <div class="flex justify-between items-center py-2 border-b border-gray-100">
+        <div class="flex justify-between items-center py-3 border-b border-gray-100">
           <span class="text-gray-500">当前模型</span>
           <span class="font-medium text-gray-900">
             {{ providerStore.currentConfig.currentProvider.name }}
           </span>
         </div>
 
-        <div class="flex justify-between items-center py-2 border-b border-gray-100">
+        <div class="flex justify-between items-center py-3 border-b border-gray-100">
           <span class="text-gray-500">模型代码</span>
-          <span class="font-mono text-gray-900">
+          <span class="font-mono text-gray-900 text-sm bg-gray-50 px-2 py-1 rounded-md">
             {{ providerStore.currentConfig.currentProvider.code }}
           </span>
         </div>
 
-        <div class="flex justify-between items-center py-2 border-b border-gray-100">
+        <div class="flex justify-between items-center py-3 border-b border-gray-100">
           <span class="text-gray-500">API 超时</span>
-          <span class="text-gray-900">
+          <span class="text-gray-900 font-mono text-sm bg-gray-50 px-2 py-1 rounded-md">
             {{ providerStore.currentConfig.apiTimeout }}ms
           </span>
         </div>
       </div>
+
+      <div v-else class="text-center py-8 text-gray-500">
+        暂无配置，请选择一个模型
+      </div>
     </div>
 
     <!-- Switch Model -->
-    <div class="bg-white rounded-xl p-6 shadow-sm">
-      <h3 class="text-lg font-semibold text-gray-900 mb-4">切换模型</h3>
+    <div class="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm">
+      <h3 class="text-xl font-semibold text-gray-900 mb-6">切换模型</h3>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <button
           v-for="provider in providerStore.providers.filter(p => p.hasApiKey)"
           :key="provider.code"
           @click="handleSwitch(provider.code)"
-          class="p-4 border rounded-lg text-left hover:border-primary-500 hover:bg-primary-50 transition-colors"
+          class="p-5 border border-gray-200 rounded-xl text-left hover:border-gray-900 hover:bg-gray-50 transition-all duration-200 hover:shadow-md"
           :class="{
-            'border-primary-500 bg-primary-50': providerStore.currentConfig?.currentProvider.code === provider.code
+            'border-gray-900 bg-gray-50 shadow-md': providerStore.currentConfig?.currentProvider.code === provider.code
           }"
         >
-          <div class="font-medium text-gray-900">{{ provider.name }}</div>
-          <div class="text-sm text-gray-500">{{ provider.modelName }}</div>
+          <div class="font-medium text-gray-900 text-lg">{{ provider.name }}</div>
+          <div class="text-sm text-gray-500 mt-1 font-mono">{{ provider.modelName }}</div>
         </button>
       </div>
 
-      <div v-if="providerStore.providers.filter(p => p.hasApiKey).length === 0" class="text-center py-8 text-gray-500">
+      <div v-if="providerStore.providers.filter(p => p.hasApiKey).length === 0" class="text-center py-12 text-gray-500">
         暂无可用的模型，请先在「模型管理」中配置 API Key
       </div>
     </div>

@@ -69,7 +69,7 @@ struct AIChatView: View {
                     }
                     .padding()
                 }
-                .onChange(of: messages.count) { _, _ in
+                .onChange(of: messages.count) { _ in
                     if let lastMessage = messages.last {
                         withAnimation {
                             proxy.scrollTo(lastMessage.id, anchor: .bottom)
@@ -183,9 +183,4 @@ struct MessageBubble: View {
 
 extension Notification.Name {
     static let providerSwitched = Notification.Name("providerSwitched")
-}
-
-#Preview {
-    AIChatView()
-        .frame(width: 500, height: 600)
 }

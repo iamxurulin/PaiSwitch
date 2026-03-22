@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useProviderStore } from '@/stores/provider'
 import { useToastStore } from '@/stores/toast'
 import type { ProviderInfo, ProviderConfigUpdateRequest, CustomProviderCreateRequest } from '@/types'
@@ -22,6 +22,30 @@ const originalConfig = ref({
   baseUrl: '',
   modelName: '',
   modelNameSmall: ''
+})
+
+const currentProvider = computed(() => providerStore.currentConfig?.currentProvider)
+
+const sortedProviders = computed(() => {
+  const providers = [...providerStore.providers]
+
+  // Sort by priority:
+  // 1. Current selected provider first
+  // 2. Has API Key comes before no API Key
+  // 3. Default order is what's stored
+  providers.sort((a, b) => {
+    const aIsCurrent = a.code === currentProvider.value?.code
+    const bIsCurrent = b.code === currentProvider.value?.code
+    if (aIsCurrent && !bIsCurrent) return -1
+    if (!aIsCurrent && bIsCurrent) return 1
+
+    if (a.hasApiKey && !b.hasApiKey) return -1
+    if (!a.hasApiKey && b.hasApiKey) return 1
+
+    return 0
+  })
+
+  return providers
 })
 
 // Config edit form
@@ -59,6 +83,16 @@ function toProviderCode(value: string): string {
   return normalized.slice(0, 50)
 }
 
+function getHostname(baseUrl?: string): string {
+  if (!baseUrl) return ''
+  try {
+    const url = new URL(baseUrl)
+    return url.hostname
+  } catch {
+    return ''
+  }
+}
+
 function openCreateModal() {
   customForm.value = {
     name: '',
@@ -79,8 +113,13 @@ async function createCustomProvider() {
   const modelName = normalizeInput(customForm.value.modelName)
   const code = toProviderCode(normalizeInput(customForm.value.code) || name)
 
-  if (!name || !baseUrl || !modelName) {
-    toastStore.error('请填写名称、Base URL 和模型名称')
+  if (!name) {
+    toastStore.error('请填写名称')
+    return
+  }
+
+  if (!baseUrl) {
+    toastStore.error('请填写 Base URL')
     return
   }
 
@@ -166,7 +205,7 @@ async function saveConfig() {
     if (nextBaseUrl !== originalConfig.value.baseUrl && nextBaseUrl) {
       configPayload.baseUrl = nextBaseUrl
     }
-    if (nextModelName !== originalConfig.value.modelName && nextModelName) {
+    if (nextModelName !== originalConfig.value.modelName) {
       configPayload.modelName = nextModelName
     }
     if (nextModelNameSmall !== originalConfig.value.modelNameSmall) {
@@ -254,83 +293,99 @@ async function deleteKey(providerCode: string) {
 
 <template>
   <div>
-    <div class="flex items-center justify-between mb-6">
-      <h2 class="text-2xl font-bold text-gray-900">模型管理</h2>
+    <div class="flex items-center justify-between mb-10">
+      <div>
+        <h2 class="text-3xl font-bold tracking-tight text-gray-900">模型管理</h2>
+        <p class="text-gray-500 mt-2 font-light">管理你的 AI 模型提供商和 API 密钥配置</p>
+      </div>
       <button
         @click="openCreateModal"
-        class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
+        class="px-6 py-3 bg-gray-900 hover:bg-gray-800 text-white rounded-xl transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5"
       >
-        新增自定义模型
+        <span class="flex items-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+          </svg>
+          新增自定义模型
+        </span>
       </button>
     </div>
 
     <!-- Providers Grid -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       <div
-        v-for="provider in providerStore.providers"
+        v-for="provider in sortedProviders"
         :key="provider.id"
-        class="bg-white rounded-xl p-6 shadow-sm"
+        class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group"
       >
-        <div class="flex items-start justify-between mb-4">
-          <div>
-            <div class="flex items-center gap-2">
-              <h3 class="font-semibold text-gray-900">{{ provider.name }}</h3>
-              <span
-                v-if="provider.hasApiKey"
-                class="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full"
-              >
-                已配置
-              </span>
-              <span
-                v-else
-                class="px-2 py-0.5 bg-gray-100 text-gray-500 text-xs rounded-full"
-              >
-                未配置
-              </span>
+        <div class="flex items-start justify-between mb-5">
+          <div class="min-w-0">
+            <div class="flex items-center gap-2 mb-1.5">
+              <h3 class="font-semibold text-lg text-gray-900 truncate">{{ provider.name }}</h3>
             </div>
-            <p class="text-sm text-gray-500">{{ provider.description }}</p>
+            <p v-if="provider.description" class="text-sm text-gray-500 line-clamp-2">{{ provider.description }}</p>
+            <p v-else class="text-sm text-gray-400 italic">无描述</p>
           </div>
+        </div>
+
+        <div class="flex flex-wrap gap-2 mb-5">
+          <span
+            v-if="provider.hasApiKey"
+            class="px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-medium rounded-full"
+          >
+            已配置
+          </span>
+          <span
+            v-else
+            class="px-3 py-1 bg-gray-100 text-gray-500 text-xs font-medium rounded-full"
+          >
+            未配置
+          </span>
           <span
             v-if="provider.isBuiltin"
-            class="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full"
+            class="px-3 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded-full"
           >
             内置
           </span>
           <span
             v-else
-            class="px-2 py-1 bg-amber-100 text-amber-700 text-xs rounded-full"
+            class="px-3 py-1 bg-amber-50 text-amber-700 text-xs font-medium rounded-full"
           >
             自定义
           </span>
         </div>
 
-        <div class="space-y-2 text-sm mb-4">
-          <div class="flex justify-between">
+        <div class="space-y-3 text-sm mb-6">
+          <div class="flex justify-between items-center">
             <span class="text-gray-500">模型</span>
-            <span class="text-gray-900 font-mono">{{ provider.modelName }}</span>
+            <span class="text-gray-900 font-mono text-xs bg-gray-50 px-2 py-1 rounded-md max-w-[180px] truncate">{{ provider.modelName }}</span>
           </div>
-          <div v-if="provider.modelNameSmall" class="flex justify-between">
+          <div v-if="provider.modelNameSmall" class="flex justify-between items-center">
             <span class="text-gray-500">小模型</span>
-            <span class="text-gray-900 font-mono">{{ provider.modelNameSmall }}</span>
+            <span class="text-gray-900 font-mono text-xs bg-gray-50 px-2 py-1 rounded-md max-w-[180px] truncate">{{ provider.modelNameSmall }}</span>
+          </div>
+          <div v-if="getHostname(provider.baseUrl)" class="flex justify-between items-center">
+            <span class="text-gray-500">端点</span>
+            <span class="text-gray-900 text-xs bg-gray-50 px-2 py-1 rounded-md max-w-[180px] truncate">{{ getHostname(provider.baseUrl) }}</span>
           </div>
         </div>
 
-        <div class="flex gap-2">
+        <div class="flex gap-3">
           <button
             @click="openConfigModal(provider)"
-            class="flex-1 px-3 py-2 text-sm bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg transition-colors flex items-center justify-center"
+            class="flex-1 px-4 py-2.5 text-sm bg-gray-900 hover:bg-gray-800 text-white rounded-xl transition-all duration-200 flex items-center justify-center group-hover:shadow-md"
             title="编辑模型配置"
           >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
             </svg>
-            <span class="ml-1">编辑配置</span>
+            编辑配置
           </button>
           <button
             v-if="provider.hasApiKey"
             @click="deleteKey(provider.code)"
-            class="px-3 py-2 text-sm bg-red-100 hover:bg-red-200 text-red-700 rounded-lg transition-colors"
+            class="px-4 py-2.5 text-sm border border-red-200 hover:bg-red-50 text-red-600 rounded-xl transition-colors"
           >
             删除
           </button>
@@ -341,92 +396,93 @@ async function deleteKey(providerCode: string) {
     <!-- Create Custom Provider Modal -->
     <div
       v-if="showCreateModal"
-      class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+      class="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-200"
       @click.self="showCreateModal = false"
     >
-      <div class="bg-white rounded-xl p-6 w-full max-w-md">
-        <h3 class="text-lg font-semibold text-gray-900 mb-4">新增自定义模型</h3>
+      <div class="bg-white rounded-2xl p-8 w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-200">
+        <h3 class="text-xl font-semibold text-gray-900 mb-6">新增自定义模型</h3>
 
-        <div class="space-y-4">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">名称</label>
-            <input
-              v-model="customForm.name"
-              type="text"
-              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              placeholder="例如: Qwen 3.5 Plus"
-            />
+        <div class="space-y-5">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">名称</label>
+              <input
+                v-model="customForm.name"
+                type="text"
+                class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-gray-900 focus:border-gray-900 transition-all outline-none"
+                placeholder="例如: Qwen 3.5 Plus"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">编码 (可选)</label>
+              <input
+                v-model="customForm.code"
+                type="text"
+                class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-gray-900 focus:border-gray-900 transition-all outline-none"
+                placeholder="留空自动生成"
+              />
+            </div>
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">编码 (可选)</label>
-            <input
-              v-model="customForm.code"
-              type="text"
-              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              placeholder="留空自动生成，例如 qwen-3-5-plus"
-            />
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Base URL</label>
-            <input
-              v-model="customForm.baseUrl"
-              type="text"
-              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              placeholder="例如: https://dashscope.aliyuncs.com/compatible-mode/v1"
-            />
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">模型名称</label>
-            <input
-              v-model="customForm.modelName"
-              type="text"
-              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              placeholder="例如: qwen-plus"
-            />
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">小模型名称 (可选)</label>
-            <input
-              v-model="customForm.modelNameSmall"
-              type="text"
-              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              placeholder="例如: qwen-turbo"
-            />
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">说明 (可选)</label>
-            <input
-              v-model="customForm.description"
-              type="text"
-              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              placeholder="例如: Qwen compatible endpoint"
-            />
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">API Key (可选)</label>
-            <div class="flex items-center gap-2">
+            <label class="block text-sm font-medium text-gray-700 mb-2">API Key (可选)</label>
+            <div class="flex gap-2">
               <input
                 v-model="createApiKey"
                 :type="showCreateApiKey ? 'text' : 'password'"
-                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                placeholder="可选，创建后会自动保存"
+                class="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-gray-900 focus:border-gray-900 transition-all outline-none"
+                placeholder="可选，创建后自动保存"
               />
               <button
                 type="button"
                 @click="showCreateApiKey = !showCreateApiKey"
                 :disabled="!createApiKey"
-                class="px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg disabled:opacity-50 transition-colors"
-                :title="showCreateApiKey ? '隐藏 API Key' : '显示 API Key'"
+                class="px-3 py-3 text-sm bg-gray-100 hover:bg-gray-200 rounded-xl disabled:opacity-50 transition-colors whitespace-nowrap flex-shrink-0"
               >
-                {{ showCreateApiKey ? '隐藏' : '👀' }}
+                {{ showCreateApiKey ? '隐藏' : '显示' }}
               </button>
             </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Base URL</label>
+            <input
+              v-model="customForm.baseUrl"
+              type="text"
+              class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-gray-900 focus:border-gray-900 transition-all outline-none"
+              placeholder="例如: https://dashscope.aliyuncs.com/compatible-mode/v1"
+            />
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">模型名称 (可选)</label>
+              <input
+                v-model="customForm.modelName"
+                type="text"
+                class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-gray-900 focus:border-gray-900 transition-all outline-none"
+                placeholder="例如: qwen-plus，不填则留空"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">小模型名称 (可选)</label>
+              <input
+                v-model="customForm.modelNameSmall"
+                type="text"
+                class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-gray-900 focus:border-gray-900 transition-all outline-none"
+                placeholder="例如: qwen-turbo"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">说明 (可选)</label>
+            <input
+              v-model="customForm.description"
+              type="text"
+              class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-gray-900 focus:border-gray-900 transition-all outline-none"
+              placeholder="例如: 通义千问兼容端点"
+            />
           </div>
         </div>
 
@@ -434,17 +490,17 @@ async function deleteKey(providerCode: string) {
           提示：编码仅支持小写字母、数字和中划线；留空会根据名称自动生成
         </p>
 
-        <div class="flex justify-end gap-3 mt-6">
+        <div class="flex justify-end gap-3 mt-8">
           <button
             @click="showCreateModal = false"
-            class="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            class="px-5 py-2.5 text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
           >
             取消
           </button>
           <button
             @click="createCustomProvider"
             :disabled="creatingCustom"
-            class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg disabled:opacity-50 transition-colors"
+            class="px-5 py-2.5 bg-gray-900 hover:bg-gray-800 text-white rounded-xl disabled:opacity-50 transition-all"
           >
             {{ creatingCustom ? '创建中...' : '确认新增' }}
           </button>
@@ -455,52 +511,53 @@ async function deleteKey(providerCode: string) {
     <!-- Config Modal -->
     <div
       v-if="showConfigModal"
-      class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+      class="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-200"
       @click.self="showConfigModal = false"
     >
-      <div class="bg-white rounded-xl p-6 w-full max-w-md">
-        <h3 class="text-lg font-semibold text-gray-900 mb-4">
+      <div class="bg-white rounded-2xl p-8 w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-200">
+        <h3 class="text-xl font-semibold text-gray-900 mb-6">
           编辑配置 - {{ selectedProvider?.name }}
         </h3>
 
-        <div class="space-y-4">
+        <div class="space-y-5">
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Base URL</label>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Base URL</label>
             <input
               v-model="configForm.baseUrl"
               type="text"
-              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-gray-900 focus:border-gray-900 transition-all outline-none"
               placeholder="例如: https://api.example.com"
             />
           </div>
 
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">模型名称</label>
-            <input
-              v-model="configForm.modelName"
-              type="text"
-              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              placeholder="例如: gpt-4"
-            />
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">模型名称 (可选)</label>
+              <input
+                v-model="configForm.modelName"
+                type="text"
+                class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-gray-900 focus:border-gray-900 transition-all outline-none"
+                placeholder="例如: gpt-4；Kimi Coding 可留空"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">小模型名称 (可选)</label>
+              <input
+                v-model="configForm.modelNameSmall"
+                type="text"
+                class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-gray-900 focus:border-gray-900 transition-all outline-none"
+                placeholder="例如: gpt-3.5-turbo"
+              />
+            </div>
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">小模型名称 (可选)</label>
-            <input
-              v-model="configForm.modelNameSmall"
-              type="text"
-              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              placeholder="例如: gpt-3.5-turbo"
-            />
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">API Key (可选)</label>
-            <div class="flex items-center gap-2">
+            <label class="block text-sm font-medium text-gray-700 mb-2">API Key (可选)</label>
+            <div class="flex gap-2">
               <input
                 v-model="configApiKey"
                 :type="showApiKey ? 'text' : 'password'"
-                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                class="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-gray-900 focus:border-gray-900 transition-all outline-none"
                 :placeholder="loadingApiKey ? '正在加载 API Key...' : '留空则不更新 API Key'"
                 :disabled="loadingApiKey"
               />
@@ -508,14 +565,13 @@ async function deleteKey(providerCode: string) {
                 type="button"
                 @click="showApiKey = !showApiKey"
                 :disabled="loadingApiKey || !configApiKey"
-                class="px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg disabled:opacity-50 transition-colors"
-                :title="showApiKey ? '隐藏 API Key' : '显示 API Key'"
+                class="px-3 py-3 text-sm bg-gray-100 hover:bg-gray-200 rounded-xl disabled:opacity-50 transition-colors whitespace-nowrap flex-shrink-0"
               >
-                {{ showApiKey ? '隐藏' : '👀' }}
+                {{ showApiKey ? '隐藏' : '显示' }}
               </button>
             </div>
-            <p v-if="!showApiKey && configApiKey" class="mt-1 text-xs text-gray-500">
-              当前显示为 ****（已隐藏）
+            <p v-if="!showApiKey && configApiKey" class="mt-2 text-xs text-gray-500">
+              当前已隐藏，请点击显示查看内容
             </p>
           </div>
         </div>
@@ -523,38 +579,38 @@ async function deleteKey(providerCode: string) {
         <!-- Test Result -->
         <div
           v-if="testResult"
-          class="mt-4 p-3 rounded-lg text-sm"
-          :class="testResult.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'"
+          class="mt-6 p-4 rounded-xl text-sm animate-in fade-in slide-in-from-bottom-2 duration-200"
+          :class="testResult.success ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-red-50 text-red-700 border border-red-100'"
         >
           <div class="flex items-center gap-2">
-            <svg v-if="testResult.success" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <svg v-if="testResult.success" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
               <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
             </svg>
-            <svg v-else class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <svg v-else class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
               <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
             </svg>
             <span>{{ testResult.message }}</span>
-            <span v-if="testResult.responseTimeMs" class="ml-auto text-xs opacity-75">
+            <span v-if="testResult.responseTimeMs" class="ml-auto text-xs opacity-75 font-mono">
               {{ testResult.responseTimeMs }}ms
             </span>
           </div>
         </div>
 
         <p class="mt-4 text-xs text-gray-500">
-          提示：API Key 留空表示不修改；配置修改后仅更新数据库，切换模型时才会同步到 settings.json
+          提示：API Key 留空表示不修改；模型名称可留空（如 Kimi Coding）；配置修改后仅更新数据库，切换模型时才会同步到 settings.json
         </p>
 
-        <div class="flex justify-end gap-3 mt-6">
+        <div class="flex justify-end gap-3 mt-8">
           <button
             @click="showConfigModal = false"
-            class="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            class="px-5 py-2.5 text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
           >
             取消
           </button>
           <button
             @click="testConnection"
             :disabled="testing || loadingApiKey"
-            class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50 transition-colors flex items-center gap-2"
+            class="px-5 py-2.5 bg-gray-800 hover:bg-gray-700 text-white rounded-xl disabled:opacity-50 transition-colors flex items-center gap-2"
           >
             <svg v-if="testing" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
@@ -565,7 +621,7 @@ async function deleteKey(providerCode: string) {
           <button
             @click="saveConfig"
             :disabled="saving || loadingApiKey"
-            class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg disabled:opacity-50 transition-colors"
+            class="px-5 py-2.5 bg-gray-900 hover:bg-gray-800 text-white rounded-xl disabled:opacity-50 transition-colors"
           >
             {{ saving ? '保存中...' : '保存' }}
           </button>

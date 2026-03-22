@@ -50,7 +50,6 @@ public class ProviderDto {
         @NotBlank(message = "Base URL is required")
         private String baseUrl;
 
-        @NotBlank(message = "Model name is required")
         @Size(max = 100, message = "Model name must be at most 100 characters")
         private String modelName;
 

@@ -26,6 +26,12 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ProviderService {
 
+    private enum ProviderApiStyle {
+        OPENROUTER,
+        ANTHROPIC,
+        OPENAI
+    }
+
     private final ModelProviderRepository providerRepository;
     private final ApiKeyRepository apiKeyRepository;
     private final EncryptionService encryptionService;
@@ -76,18 +82,19 @@ public class ProviderService {
 
     @Transactional
     public ProviderDto.ProviderInfo createCustomProvider(Long userId, ProviderDto.CreateRequest request) {
-        if (providerRepository.existsByCode(request.getCode())) {
+        String code = sanitizeCode(request.getCode());
+        if (providerRepository.existsByCode(code)) {
             throw new BusinessException(ResponseCode.PROVIDER_ALREADY_EXISTS);
         }
 
         ModelProvider provider = ModelProvider.builder()
-                .code(request.getCode())
-                .name(request.getName())
-                .description(request.getDescription())
-                .baseUrl(request.getBaseUrl())
-                .modelName(request.getModelName())
-                .modelNameSmall(request.getModelNameSmall())
-                .iconUrl(request.getIconUrl())
+                .code(code)
+                .name(sanitizeOptionalText(request.getName()))
+                .description(sanitizeOptionalText(request.getDescription()))
+                .baseUrl(sanitizeOptionalText(request.getBaseUrl()))
+                .modelName(sanitizeText(request.getModelName()))
+                .modelNameSmall(sanitizeOptionalText(request.getModelNameSmall()))
+                .iconUrl(sanitizeOptionalText(request.getIconUrl()))
                 .isBuiltin(false)
                 .isActive(true)
                 .sortOrder(100)
@@ -107,13 +114,13 @@ public class ProviderService {
             throw new BusinessException(ResponseCode.FORBIDDEN, "Cannot modify built-in providers");
         }
 
-        if (request.getName() != null) provider.setName(request.getName());
-        if (request.getDescription() != null) provider.setDescription(request.getDescription());
-        if (request.getBaseUrl() != null) provider.setBaseUrl(request.getBaseUrl());
-        if (request.getModelName() != null) provider.setModelName(request.getModelName());
-        if (request.getModelNameSmall() != null) provider.setModelNameSmall(request.getModelNameSmall());
+        if (request.getName() != null) provider.setName(sanitizeOptionalText(request.getName()));
+        if (request.getDescription() != null) provider.setDescription(sanitizeOptionalText(request.getDescription()));
+        if (request.getBaseUrl() != null) provider.setBaseUrl(sanitizeOptionalText(request.getBaseUrl()));
+        if (request.getModelName() != null) provider.setModelName(sanitizeOptionalText(request.getModelName()));
+        if (request.getModelNameSmall() != null) provider.setModelNameSmall(sanitizeOptionalText(request.getModelNameSmall()));
         if (request.getIsActive() != null) provider.setIsActive(request.getIsActive());
-        if (request.getIconUrl() != null) provider.setIconUrl(request.getIconUrl());
+        if (request.getIconUrl() != null) provider.setIconUrl(sanitizeOptionalText(request.getIconUrl()));
 
         provider = providerRepository.save(provider);
         log.info("Updated provider: {} by user: {}", provider.getCode(), userId);
@@ -130,14 +137,18 @@ public class ProviderService {
         ModelProvider provider = providerRepository.findByCode(code)
                 .orElseThrow(() -> new BusinessException(ResponseCode.PROVIDER_NOT_FOUND));
 
-        if (request.getBaseUrl() != null && !request.getBaseUrl().isEmpty()) {
-            provider.setBaseUrl(request.getBaseUrl());
+        String sanitizedBaseUrl = sanitizeOptionalText(request.getBaseUrl());
+        String sanitizedModelName = sanitizeOptionalText(request.getModelName());
+        String sanitizedModelNameSmall = sanitizeOptionalText(request.getModelNameSmall());
+
+        if (sanitizedBaseUrl != null && !sanitizedBaseUrl.isEmpty()) {
+            provider.setBaseUrl(sanitizedBaseUrl);
         }
-        if (request.getModelName() != null && !request.getModelName().isEmpty()) {
-            provider.setModelName(request.getModelName());
+        if (request.getModelName() != null) {
+            provider.setModelName(sanitizedModelName == null ? "" : sanitizedModelName);
         }
         if (request.getModelNameSmall() != null) {
-            provider.setModelNameSmall(request.getModelNameSmall().isEmpty() ? null : request.getModelNameSmall());
+            provider.setModelNameSmall(sanitizedModelNameSmall == null || sanitizedModelNameSmall.isEmpty() ? null : sanitizedModelNameSmall);
         }
 
         provider = providerRepository.save(provider);
@@ -167,7 +178,9 @@ public class ProviderService {
                     .message("Base URL 未配置")
                     .build();
         }
-        if (modelName == null || modelName.isBlank()) {
+        String normalizedUrl = normalizeBaseUrl(baseUrl);
+        ProviderApiStyle apiStyle = resolveApiStyle(provider.getCode(), normalizedUrl);
+        if (requiresModelNameForTest(apiStyle, normalizedUrl) && (modelName == null || modelName.isBlank())) {
             return ProviderDto.TestResult.builder()
                     .success(false)
                     .message("模型名称未配置")
@@ -190,31 +203,26 @@ public class ProviderService {
                     .build();
         }
 
-        return performTestRequest(provider.getCode(), baseUrl, modelName, apiKey);
+        return performTestRequest(provider.getCode(), normalizedUrl, modelName, apiKey);
     }
 
-    private ProviderDto.TestResult performTestRequest(String providerCode, String baseUrl, String modelName, String apiKey) {
+    private ProviderDto.TestResult performTestRequest(String providerCode, String normalizedUrl, String modelName, String apiKey) {
         long startTime = System.currentTimeMillis();
         String testUrl = "";
 
         try {
-            // Normalize base URL
-            String normalizedUrl = normalizeBaseUrl(baseUrl);
             String normalizedApiKey = normalizeApiKey(apiKey);
-            boolean useOpenRouterApi = isOpenRouterProvider(providerCode, normalizedUrl);
+            ProviderApiStyle apiStyle = resolveApiStyle(providerCode, normalizedUrl);
 
-            testUrl = useOpenRouterApi
-                    ? buildOpenRouterChatCompletionsUrl(normalizedUrl)
-                    : buildMessagesTestUrl(normalizedUrl);
-            String requestBody = useOpenRouterApi
-                    ? buildOpenRouterTestRequestBody(modelName)
-                    : """
-                        {
-                            "model": "%s",
-                            "max_tokens": 10,
-                            "messages": [{"role": "user", "content": "Hi"}]
-                        }
-                        """.formatted(modelName);
+            testUrl = switch (apiStyle) {
+                case OPENROUTER, OPENAI -> buildChatCompletionsUrl(normalizedUrl);
+                case ANTHROPIC -> buildMessagesTestUrl(normalizedUrl);
+            };
+            String requestBody = switch (apiStyle) {
+                case OPENROUTER -> buildOpenRouterTestRequestBody(modelName);
+                case OPENAI -> buildOpenAiCompatibleTestRequestBody(modelName);
+                case ANTHROPIC -> buildAnthropicTestRequestBody(modelName);
+            };
 
             HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
                     .uri(URI.create(testUrl))
@@ -222,18 +230,19 @@ public class ProviderService {
                     .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                     .timeout(Duration.ofSeconds(30));
 
-            if (useOpenRouterApi) {
-                requestBuilder.header("Authorization", "Bearer " + normalizedApiKey);
-            } else {
-                requestBuilder
-                        .header("x-api-key", normalizedApiKey)
-                        .header("anthropic-version", "2023-06-01");
+            switch (apiStyle) {
+                case OPENROUTER, OPENAI ->
+                        requestBuilder.header("Authorization", "Bearer " + normalizedApiKey);
+                case ANTHROPIC ->
+                        requestBuilder
+                                .header("x-api-key", normalizedApiKey)
+                                .header("anthropic-version", "2023-06-01");
             }
 
             log.info("Test request -> provider={}, url={}, auth={}, apiKey={}, body={}",
                     providerCode,
                     testUrl,
-                    useOpenRouterApi ? "Authorization: Bearer" : "x-api-key",
+                    authHeaderName(apiStyle),
                     maskApiKey(normalizedApiKey),
                     singleLine(requestBody));
 
@@ -244,11 +253,11 @@ public class ProviderService {
                     response.statusCode(),
                     truncate(response.body(), 4000));
 
-            if (useOpenRouterApi && shouldRetryOpenRouterWithAvailableProviders(response)) {
+            if (apiStyle == ProviderApiStyle.OPENROUTER && shouldRetryOpenRouterWithAvailableProviders(response)) {
                 List<String> availableProviders = extractOpenRouterAvailableProviders(response.body());
                 if (!availableProviders.isEmpty()) {
                     String retryRequestBody = buildOpenRouterTestRequestBody(modelName, availableProviders);
-                    HttpRequest retryRequest = buildHttpRequest(testUrl, retryRequestBody, true, normalizedApiKey);
+                    HttpRequest retryRequest = buildHttpRequest(testUrl, retryRequestBody, apiStyle, normalizedApiKey);
                     log.info("Test retry request -> provider={}, url={}, order={}, body={}",
                             providerCode,
                             testUrl,
@@ -305,7 +314,9 @@ public class ProviderService {
         if (value == null) {
             return "";
         }
-        return value.replaceAll("\\s+", " ").trim();
+        return sanitizeText(value)
+                .replaceAll("\\s+", " ")
+                .trim();
     }
 
     private String truncate(String value, int maxLength) {
@@ -322,7 +333,7 @@ public class ProviderService {
         if (apiKey == null) {
             return "";
         }
-        String normalized = apiKey.trim();
+        String normalized = sanitizeText(apiKey);
         if (normalized.regionMatches(true, 0, "Bearer ", 0, 7)) {
             return normalized.substring(7).trim();
         }
@@ -333,14 +344,78 @@ public class ProviderService {
         return "openrouter".equalsIgnoreCase(providerCode) || normalizedUrl.toLowerCase().contains("openrouter.ai");
     }
 
-    private String buildOpenRouterChatCompletionsUrl(String normalizedUrl) {
+    private ProviderApiStyle resolveApiStyle(String providerCode, String normalizedUrl) {
+        String lowerUrl = normalizedUrl.toLowerCase();
+        if (isOpenRouterProvider(providerCode, normalizedUrl)) {
+            return ProviderApiStyle.OPENROUTER;
+        }
+        if (isKimiCodingProvider(normalizedUrl)) {
+            return ProviderApiStyle.ANTHROPIC;
+        }
+        if (isAnthropicCompatibleProvider(lowerUrl)) {
+            return ProviderApiStyle.ANTHROPIC;
+        }
+        return ProviderApiStyle.OPENAI;
+    }
+
+    private boolean isAnthropicCompatibleProvider(String lowerUrl) {
+        return lowerUrl.contains("anthropic.com")
+                || lowerUrl.contains("/anthropic")
+                || lowerUrl.endsWith("/messages")
+                || lowerUrl.endsWith("/v1/messages");
+    }
+
+    private boolean isKimiCodingProvider(String normalizedUrl) {
+        return normalizedUrl.toLowerCase().contains("api.kimi.com/coding");
+    }
+
+    private boolean requiresModelNameForTest(ProviderApiStyle apiStyle, String normalizedUrl) {
+        if (apiStyle == ProviderApiStyle.ANTHROPIC && isKimiCodingProvider(normalizedUrl)) {
+            return false;
+        }
+        return true;
+    }
+
+    private String authHeaderName(ProviderApiStyle apiStyle) {
+        return apiStyle == ProviderApiStyle.ANTHROPIC ? "x-api-key" : "Authorization: Bearer";
+    }
+
+    private String buildChatCompletionsUrl(String normalizedUrl) {
         if (normalizedUrl.endsWith("/v1/chat/completions") || normalizedUrl.endsWith("/chat/completions")) {
             return normalizedUrl;
         }
-        if (normalizedUrl.endsWith("/v1")) {
+        if (normalizedUrl.endsWith("/v1") || normalizedUrl.endsWith("/api/v3")) {
             return normalizedUrl + "/chat/completions";
         }
         return normalizedUrl + "/v1/chat/completions";
+    }
+
+    private String buildOpenAiCompatibleTestRequestBody(String modelName) {
+        return """
+            {
+                "model": "%s",
+                "max_tokens": 10,
+                "messages": [{"role": "user", "content": "Hi"}]
+            }
+            """.formatted(modelName);
+    }
+
+    private String buildAnthropicTestRequestBody(String modelName) {
+        if (modelName == null || modelName.isBlank()) {
+            return """
+                {
+                    "max_tokens": 10,
+                    "messages": [{"role": "user", "content": "Hi"}]
+                }
+                """;
+        }
+        return """
+            {
+                "model": "%s",
+                "max_tokens": 10,
+                "messages": [{"role": "user", "content": "Hi"}]
+            }
+            """.formatted(modelName);
     }
 
     private String buildOpenRouterTestRequestBody(String modelName) {
@@ -422,19 +497,19 @@ public class ProviderService {
         }
     }
 
-    private HttpRequest buildHttpRequest(String testUrl, String requestBody, boolean useOpenRouterApi, String apiKey) {
+    private HttpRequest buildHttpRequest(String testUrl, String requestBody, ProviderApiStyle apiStyle, String apiKey) {
         HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
                 .uri(URI.create(testUrl))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                 .timeout(Duration.ofSeconds(30));
 
-        if (useOpenRouterApi) {
-            requestBuilder.header("Authorization", "Bearer " + apiKey);
-        } else {
+        if (apiStyle == ProviderApiStyle.ANTHROPIC) {
             requestBuilder
                     .header("x-api-key", apiKey)
                     .header("anthropic-version", "2023-06-01");
+        } else {
+            requestBuilder.header("Authorization", "Bearer " + apiKey);
         }
         return requestBuilder.build();
     }
@@ -472,7 +547,7 @@ public class ProviderService {
     }
 
     private String normalizeBaseUrl(String baseUrl) {
-        String normalizedUrl = baseUrl.trim();
+        String normalizedUrl = sanitizeText(baseUrl);
         if (!normalizedUrl.startsWith("http://") && !normalizedUrl.startsWith("https://")) {
             normalizedUrl = "https://" + normalizedUrl;
         }
@@ -480,6 +555,27 @@ public class ProviderService {
             normalizedUrl = normalizedUrl.substring(0, normalizedUrl.length() - 1);
         }
         return normalizedUrl;
+    }
+
+    private String sanitizeText(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value
+                .trim()
+                // 移除所有不可见的特殊字符（零宽度空格等控制字符）
+                .replaceAll("[\\x00-\\x1F\\x7F-\\x9F\\u200b-\\u200d\\ufeff]", "");
+    }
+
+    private String sanitizeOptionalText(String value) {
+        if (value == null) {
+            return null;
+        }
+        return sanitizeText(value);
+    }
+
+    private String sanitizeCode(String value) {
+        return sanitizeText(value).toLowerCase();
     }
 
     private String buildMessagesTestUrl(String normalizedUrl) {

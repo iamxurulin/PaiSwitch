@@ -3,6 +3,16 @@ import { computed } from 'vue'
 import { useProviderStore } from '@/stores/provider'
 import { useToastStore } from '@/stores/toast'
 
+function getHostname(baseUrl?: string): string {
+  if (!baseUrl) return ''
+  try {
+    const url = new URL(baseUrl)
+    return url.hostname
+  } catch {
+    return ''
+  }
+}
+
 const providerStore = useProviderStore()
 const toastStore = useToastStore()
 
@@ -13,6 +23,35 @@ const stats = computed(() => {
 })
 
 const currentProvider = computed(() => providerStore.currentConfig?.currentProvider)
+
+const sortedProviders = computed(() => {
+  const providers = [...providerStore.providers]
+
+  // Sort by priority:
+  // 1. Current selected provider first
+  // 2. Has API Key comes before no API Key
+  // 3. If updatedAt exists, newer comes first
+  providers.sort((a, b) => {
+    // Current first
+    const aIsCurrent = a.code === currentProvider.value?.code
+    const bIsCurrent = b.code === currentProvider.value?.code
+    if (aIsCurrent && !bIsCurrent) return -1
+    if (!aIsCurrent && bIsCurrent) return 1
+
+    // Has API key first
+    if (a.hasApiKey && !b.hasApiKey) return -1
+    if (!a.hasApiKey && b.hasApiKey) return 1
+
+    // Default order is what's stored
+    return 0
+  })
+
+  return providers
+})
+
+const sortedProvidersWithKey = computed(() => {
+  return sortedProviders.value.filter(p => p.hasApiKey)
+})
 
 async function handleQuickSwitch(providerCode: string) {
   const result = await providerStore.switchProvider(providerCode)
@@ -26,76 +65,111 @@ async function handleQuickSwitch(providerCode: string) {
 
 <template>
   <div>
-    <h2 class="text-2xl font-bold text-gray-900 mb-6">仪表盘</h2>
+    <div class="mb-8">
+      <h2 class="text-3xl font-bold tracking-tight text-gray-900">仪表盘</h2>
+      <p class="text-gray-500 mt-2 font-light">快速查看和切换 AI 模型</p>
+    </div>
 
     <!-- Stats -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-      <div class="bg-white rounded-xl p-6 shadow-sm">
-        <div class="text-gray-500 text-sm">当前模型</div>
-        <div class="text-2xl font-bold text-gray-900 mt-1">
-          {{ currentProvider?.name || '-' }}
+      <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-300">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-gray-500 text-sm font-light">当前模型</div>
+            <div class="text-xl font-semibold text-gray-900 mt-2 truncate max-w-[180px]">
+              {{ currentProvider?.name || '-' }}
+            </div>
+            <div v-if="currentProvider" class="text-xs text-gray-400 mt-1 font-mono truncate max-w-[180px]">
+              {{ currentProvider.modelName }}
+            </div>
+          </div>
+          <div class="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center text-2xl">
+            🤖
+          </div>
         </div>
       </div>
 
-      <div class="bg-white rounded-xl p-6 shadow-sm">
-        <div class="text-gray-500 text-sm">可用模型</div>
-        <div class="text-2xl font-bold text-gray-900 mt-1">{{ stats.total }}</div>
+      <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-300">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-gray-500 text-sm font-light">可用模型</div>
+            <div class="text-3xl font-bold tracking-tight text-gray-900 mt-2">{{ stats.total }}</div>
+          </div>
+          <div class="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center text-2xl">
+            📊
+          </div>
+        </div>
       </div>
 
-      <div class="bg-white rounded-xl p-6 shadow-sm">
-        <div class="text-gray-500 text-sm">已配置 API Key</div>
-        <div class="text-2xl font-bold text-gray-900 mt-1">{{ stats.withKey }}</div>
+      <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-300">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-gray-500 text-sm font-light">已配置 API Key</div>
+            <div class="text-3xl font-bold tracking-tight text-gray-900 mt-2">{{ stats.withKey }}</div>
+          </div>
+          <div class="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center text-2xl">
+            🔑
+          </div>
+        </div>
       </div>
     </div>
 
     <!-- Quick Switch -->
-    <div class="bg-white rounded-xl p-6 shadow-sm mb-8">
-      <h3 class="text-lg font-semibold text-gray-900 mb-4">快速切换</h3>
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm mb-8">
+      <h3 class="text-xl font-semibold text-gray-900 mb-4">快速切换</h3>
+      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
         <button
-          v-for="provider in providerStore.providers.filter(p => p.hasApiKey)"
+          v-for="provider in sortedProvidersWithKey"
           :key="provider.code"
           @click="handleQuickSwitch(provider.code)"
-          class="p-4 border rounded-lg hover:border-primary-500 hover:bg-primary-50 transition-colors"
-          :class="{ 'border-primary-500 bg-primary-50': currentProvider?.code === provider.code }"
+          class="p-4 border border-gray-200 rounded-xl hover:border-gray-900 hover:bg-gray-50 transition-all duration-200 hover:shadow-md text-left cursor-pointer"
+          :class="{ 'border-gray-900 bg-gray-50 shadow-md': currentProvider?.code === provider.code }"
         >
-          <div class="font-medium text-gray-900">{{ provider.name }}</div>
-          <div class="text-sm text-gray-500">{{ provider.modelName }}</div>
+          <div class="font-medium text-gray-900 truncate">{{ provider.name }}</div>
+          <div class="text-xs text-gray-500 mt-1 font-mono truncate">{{ provider.modelName }}</div>
         </button>
+      </div>
+      <div v-if="sortedProvidersWithKey.length === 0" class="text-center py-10 text-gray-500">
+        暂无已配置的模型，请先到模型管理添加 API Key
       </div>
     </div>
 
     <!-- Providers List -->
-    <div class="bg-white rounded-xl shadow-sm">
-      <div class="p-4 border-b border-gray-100">
-        <h3 class="text-lg font-semibold text-gray-900">模型列表</h3>
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div class="px-6 py-4 border-b border-gray-100">
+        <h3 class="text-xl font-semibold text-gray-900">所有模型</h3>
       </div>
       <div class="divide-y divide-gray-100">
         <div
-          v-for="provider in providerStore.providers"
+          v-for="provider in sortedProviders"
           :key="provider.id"
-          class="p-4 flex items-center justify-between"
+          class="px-6 py-4 flex items-center justify-between"
         >
-          <div>
-            <div class="font-medium text-gray-900">{{ provider.name }}</div>
-            <div class="text-sm text-gray-500">{{ provider.modelName }}</div>
+          <div class="min-w-0">
+            <div class="font-medium text-gray-900 text-lg truncate">{{ provider.name }}</div>
+            <div class="flex flex-wrap items-center gap-4 mt-1">
+              <span class="text-sm text-gray-500 font-mono truncate max-w-[200px]">{{ provider.modelName }}</span>
+              <span v-if="getHostname(provider.baseUrl)" class="text-xs text-gray-400">
+                {{ getHostname(provider.baseUrl) }}
+              </span>
+            </div>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-2 flex-shrink-0">
             <span
               v-if="provider.hasApiKey"
-              class="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full"
+              class="px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-medium rounded-full"
             >
               已配置
             </span>
             <span
               v-else
-              class="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full"
+              class="px-3 py-1 bg-gray-100 text-gray-500 text-xs font-medium rounded-full"
             >
               未配置
             </span>
             <span
               v-if="currentProvider?.code === provider.code"
-              class="px-2 py-1 bg-primary-100 text-primary-700 text-xs rounded-full"
+              class="px-3 py-1 bg-gray-900 text-white text-xs font-medium rounded-full"
             >
               当前
             </span>

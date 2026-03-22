@@ -1,7 +1,6 @@
 import { apiPost, apiGet, apiPut, apiDelete } from './client'
 import type {
   LoginResponse,
-  UserInfo,
   ProviderInfo,
   ApiKeyInfo,
   ApiKeyPlainInfo,
@@ -13,7 +12,12 @@ import type {
   ProviderConfigUpdateRequest,
   CustomProviderCreateRequest,
   ProviderTestRequest,
-  ProviderTestResult
+  ProviderTestResult,
+  SkillListResponse,
+  SkillDetail,
+  TrashSkillEntry,
+  RenameSkillRequest,
+  SkillSummary
 } from '@/types'
 
 // Auth API
@@ -90,4 +94,23 @@ export const switchApi = {
 
   getConversationBySessionId: (sessionId: string) =>
     apiGet<ConversationHistoryResponse>(`/ai/conversations/${encodeURIComponent(sessionId)}`)
+}
+
+// Skills API
+export const skillApi = {
+  list: () => apiGet<SkillListResponse>('/skills'),
+
+  getDetail: (folderName: string) =>
+    apiGet<SkillDetail>(`/skills/${encodeURIComponent(folderName)}`),
+
+  rename: (folderName: string, data: RenameSkillRequest) =>
+    apiPost<SkillSummary>(`/skills/${encodeURIComponent(folderName)}/rename`, data),
+
+  moveToTrash: (folderName: string) =>
+    apiPost<void>(`/skills/${encodeURIComponent(folderName)}/trash`),
+
+  listTrash: () => apiGet<TrashSkillEntry[]>('/skills/trash'),
+
+  restore: (trashEntry: string) =>
+    apiPost<SkillSummary>(`/skills/trash/${encodeURIComponent(trashEntry)}/restore`)
 }

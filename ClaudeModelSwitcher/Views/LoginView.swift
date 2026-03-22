@@ -34,7 +34,7 @@ struct LoginView: View {
                     .onAppear {
                         serverURL = authManager.getServerURL()
                     }
-                    .onChange(of: serverURL) { _, newValue in
+                    .onChange(of: serverURL) { newValue in
                         authManager.setServerURL(newValue)
                     }
             }
@@ -47,7 +47,6 @@ struct LoginView: View {
                 if !isLogin {
                     TextField("邮箱", text: $email)
                         .textFieldStyle(.roundedBorder)
-                        .textContentType(.emailAddress)
                 }
 
                 SecureField("密码", text: $password)
@@ -97,8 +96,4 @@ struct LoginView: View {
         .padding(32)
         .frame(width: 360)
     }
-}
-
-#Preview {
-    LoginView()
 }

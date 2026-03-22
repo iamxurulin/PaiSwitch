@@ -30,7 +30,13 @@ public enum ResponseCode {
     BACKUP_NOT_FOUND(4002, "Backup not found"),
 
     SWITCH_FAILED(5001, "Failed to switch provider"),
-    AI_SERVICE_ERROR(5002, "AI service error");
+    AI_SERVICE_ERROR(5002, "AI service error"),
+
+    SKILL_NOT_FOUND(6001, "Skill not found"),
+    SKILL_ALREADY_EXISTS(6002, "Skill already exists"),
+    INVALID_SKILL_NAME(6003, "Invalid skill name"),
+    SKILL_OPERATION_FAILED(6004, "Skill operation failed"),
+    TRASH_ENTRY_NOT_FOUND(6005, "Trash entry not found");
 
     private final Integer code;
     private final String message;

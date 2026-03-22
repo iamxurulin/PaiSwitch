@@ -142,10 +142,3 @@ struct ModelConfigurationView: View {
         viewModel.successMessage = "模型配置已更新"
     }
 }
-
-#Preview {
-    ModelConfigurationView(
-        viewModel: MainViewModel(),
-        provider: .zhipu
-    )
-}

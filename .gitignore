@@ -41,3 +41,4 @@ xcuserdata/
 /paiswitch-web/node_modules
 /paiswitch-backend/target
 /.idea
+.env

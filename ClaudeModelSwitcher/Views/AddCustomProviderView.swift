@@ -179,7 +179,3 @@ struct AddCustomProviderView: View {
         dismiss()
     }
 }
-
-#Preview {
-    AddCustomProviderView(viewModel: MainViewModel()) { _ in }
-}

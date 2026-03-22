@@ -32,7 +32,7 @@ const iconColorMap = {
         <div
           v-for="toast in toastStore.toasts"
           :key="toast.id"
-          class="pointer-events-auto flex items-start gap-3 p-4 rounded-lg border shadow-lg"
+          class="pointer-events-auto flex items-start gap-3 p-4 rounded-xl border shadow-lg backdrop-blur-sm bg-white/95"
           :class="colorMap[toast.type]"
         >
           <svg
