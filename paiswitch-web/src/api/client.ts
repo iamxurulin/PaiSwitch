@@ -24,10 +24,12 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    if ([401, 403].includes(error.response?.status)) {
       const authStore = useAuthStore()
-      authStore.logout()
-      window.location.href = '/login'
+      if (authStore.token) {
+        authStore.logout()
+        window.location.href = '/login'
+      }
     }
     return Promise.reject(error)
   }

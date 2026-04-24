@@ -8,12 +8,12 @@ struct ClaudeConfig: Codable {
     }
 
     var currentProvider: ModelProvider {
-        guard let baseURL = getString("ANTHROPIC_BASE_URL") else {
+        guard let baseURL = Self.normalizedClaudeCodeBaseURL(getString("ANTHROPIC_BASE_URL")) else {
             return .claude
         }
 
         for provider in ModelProvider.allCases where provider != .custom {
-            if provider.baseURL == baseURL {
+            if Self.normalizedClaudeCodeBaseURL(provider.baseURL) == baseURL {
                 return provider
             }
         }
@@ -59,6 +59,29 @@ struct ClaudeConfig: Codable {
 
     mutating func remove(_ key: String) {
         env.removeValue(forKey: key)
+    }
+
+    static func normalizedClaudeCodeBaseURL(_ baseURL: String?) -> String? {
+        guard let baseURL else {
+            return nil
+        }
+
+        let trimmed = baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return nil
+        }
+
+        let withoutTrailingSlash = trimmed.replacingOccurrences(
+            of: "/+$",
+            with: "",
+            options: .regularExpression
+        )
+
+        return withoutTrailingSlash.replacingOccurrences(
+            of: "/v1$",
+            with: "",
+            options: .regularExpression
+        )
     }
 }
 

@@ -1,9 +1,21 @@
 <script setup lang="ts">
 import { useProviderStore } from '@/stores/provider'
 import { useToastStore } from '@/stores/toast'
+import { computed } from 'vue'
+import type { ProviderInfo } from '@/types'
 
 const providerStore = useProviderStore()
 const toastStore = useToastStore()
+
+function providerSubtitle(provider: ProviderInfo): string {
+  return provider.code === 'claude' ? '官方登录' : provider.modelName
+}
+
+function isProviderSwitchable(provider: ProviderInfo): boolean {
+  return !!provider.hasApiKey || provider.code === 'claude'
+}
+
+const switchableProviders = computed(() => providerStore.providers.filter(isProviderSwitchable))
 
 async function handleSwitch(providerCode: string) {
   const result = await providerStore.switchProvider(providerCode)
@@ -60,7 +72,7 @@ async function handleSwitch(providerCode: string) {
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <button
-          v-for="provider in providerStore.providers.filter(p => p.hasApiKey)"
+          v-for="provider in switchableProviders"
           :key="provider.code"
           @click="handleSwitch(provider.code)"
           class="p-5 border border-gray-200 rounded-xl text-left hover:border-gray-900 hover:bg-gray-50 transition-all duration-200 hover:shadow-md"
@@ -69,12 +81,12 @@ async function handleSwitch(providerCode: string) {
           }"
         >
           <div class="font-medium text-gray-900 text-lg">{{ provider.name }}</div>
-          <div class="text-sm text-gray-500 mt-1 font-mono">{{ provider.modelName }}</div>
+          <div class="text-sm text-gray-500 mt-1 font-mono">{{ providerSubtitle(provider) }}</div>
         </button>
       </div>
 
-      <div v-if="providerStore.providers.filter(p => p.hasApiKey).length === 0" class="text-center py-12 text-gray-500">
-        暂无可用的模型，请先在「模型管理」中配置 API Key
+      <div v-if="switchableProviders.length === 0" class="text-center py-12 text-gray-500">
+        暂无可切换的模型，请先在「模型管理」中配置 API Key 或使用 Claude 官方登录
       </div>
     </div>
   </div>

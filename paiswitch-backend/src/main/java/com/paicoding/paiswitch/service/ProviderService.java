@@ -26,6 +26,11 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ProviderService {
 
+    private static final String CLAUDE_PROVIDER_CODE = "claude";
+    private static final String CLAUDE_OFFICIAL_BASE_URL = "https://api.anthropic.com";
+    private static final String CLAUDE_DEFAULT_MODEL = "claude-sonnet-4-20250514";
+    private static final String CLAUDE_DEFAULT_SMALL_MODEL = "claude-3-5-haiku-latest";
+
     private enum ProviderApiStyle {
         OPENROUTER,
         ANTHROPIC,
@@ -141,13 +146,24 @@ public class ProviderService {
         String sanitizedModelName = sanitizeOptionalText(request.getModelName());
         String sanitizedModelNameSmall = sanitizeOptionalText(request.getModelNameSmall());
 
-        if (sanitizedBaseUrl != null && !sanitizedBaseUrl.isEmpty()) {
+        if (CLAUDE_PROVIDER_CODE.equals(code)) {
+            if (!CLAUDE_OFFICIAL_BASE_URL.equals(provider.getBaseUrl())) {
+                provider.setBaseUrl(CLAUDE_OFFICIAL_BASE_URL);
+            }
+            if (!CLAUDE_DEFAULT_MODEL.equals(provider.getModelName())) {
+                provider.setModelName(CLAUDE_DEFAULT_MODEL);
+            }
+            if (!CLAUDE_DEFAULT_SMALL_MODEL.equals(provider.getModelNameSmall())) {
+                provider.setModelNameSmall(CLAUDE_DEFAULT_SMALL_MODEL);
+            }
+        } else if (sanitizedBaseUrl != null && !sanitizedBaseUrl.isEmpty()) {
             provider.setBaseUrl(sanitizedBaseUrl);
         }
-        if (request.getModelName() != null) {
+
+        if (!CLAUDE_PROVIDER_CODE.equals(code) && request.getModelName() != null) {
             provider.setModelName(sanitizedModelName == null ? "" : sanitizedModelName);
         }
-        if (request.getModelNameSmall() != null) {
+        if (!CLAUDE_PROVIDER_CODE.equals(code) && request.getModelNameSmall() != null) {
             provider.setModelNameSmall(sanitizedModelNameSmall == null || sanitizedModelNameSmall.isEmpty() ? null : sanitizedModelNameSmall);
         }
 

@@ -116,10 +116,15 @@ class MainViewModel: ObservableObject {
                 if provider == .claude {
                     config.remove("ANTHROPIC_BASE_URL")
                     config.remove("ANTHROPIC_AUTH_TOKEN")
+                    config.remove("ANTHROPIC_MODEL")
+                    config.remove("ANTHROPIC_SMALL_FAST_MODEL")
                     config.setString("ANTHROPIC_API_KEY", value: key)
                 } else {
                     config.setString("ANTHROPIC_AUTH_TOKEN", value: key)
-                    config.setString("ANTHROPIC_BASE_URL", value: provider.baseURL ?? "")
+                    config.setString(
+                        "ANTHROPIC_BASE_URL",
+                        value: ClaudeConfig.normalizedClaudeCodeBaseURL(provider.baseURL)
+                    )
                     config.setString("ANTHROPIC_MODEL", value: provider.defaultModel)
 
                     if let fastModel = provider.fastModel {
@@ -163,7 +168,10 @@ class MainViewModel: ObservableObject {
                 if let localKey = try? keychainManager.getAPIKey(for: ModelProvider.from(provider.code)) {
                     var config = try configManager.loadConfig()
                     config.setString("ANTHROPIC_AUTH_TOKEN", value: localKey)
-                    config.setString("ANTHROPIC_BASE_URL", value: provider.baseUrl)
+                    config.setString(
+                        "ANTHROPIC_BASE_URL",
+                        value: ClaudeConfig.normalizedClaudeCodeBaseURL(provider.baseUrl)
+                    )
                     config.setString("ANTHROPIC_MODEL", value: provider.modelName)
                     if let small = provider.modelNameSmall {
                         config.setString("ANTHROPIC_SMALL_FAST_MODEL", value: small)
@@ -248,7 +256,10 @@ class MainViewModel: ObservableObject {
 
                 var config = try configManager.loadConfig()
                 config.setString("ANTHROPIC_AUTH_TOKEN", value: key)
-                config.setString("ANTHROPIC_BASE_URL", value: provider.baseURL)
+                config.setString(
+                    "ANTHROPIC_BASE_URL",
+                    value: ClaudeConfig.normalizedClaudeCodeBaseURL(provider.baseURL)
+                )
                 config.setString("ANTHROPIC_MODEL", value: provider.defaultModel)
 
                 if let fastModel = provider.fastModel, !fastModel.isEmpty {

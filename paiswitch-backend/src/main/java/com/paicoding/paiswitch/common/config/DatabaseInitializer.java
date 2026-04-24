@@ -14,6 +14,7 @@ import java.sql.Statement;
 public class DatabaseInitializer implements ApplicationListener<ApplicationEnvironmentPreparedEvent> {
 
     private static volatile boolean initialized = false;
+    private static final String MYSQL_JDBC_PREFIX = "jdbc:mysql://";
 
     @Override
     public void onApplicationEvent(ApplicationEnvironmentPreparedEvent event) {
@@ -31,8 +32,17 @@ public class DatabaseInitializer implements ApplicationListener<ApplicationEnvir
             return;
         }
 
+        if (!isMySqlJdbcUrl(url)) {
+            log.debug("Skip database auto-create for non-MySQL datasource: {}", url);
+            return;
+        }
+
         String databaseName = extractDatabaseName(url);
         String serverUrl = extractServerUrl(url);
+        if (databaseName == null || serverUrl == null) {
+            log.warn("Skip database auto-create because datasource URL is not a supported MySQL format: {}", url);
+            return;
+        }
 
         try (Connection connection = DriverManager.getConnection(serverUrl, username, password);
              Statement statement = connection.createStatement()) {
@@ -52,7 +62,10 @@ public class DatabaseInitializer implements ApplicationListener<ApplicationEnvir
 
     private String extractDatabaseName(String url) {
         // jdbc:mysql://localhost:3306/paiswitch?params
-        int hostEnd = url.indexOf('/', url.indexOf("//") + 2);
+        int hostEnd = findDatabasePathStart(url);
+        if (hostEnd < 0 || hostEnd + 1 >= url.length()) {
+            return null;
+        }
         int questionMark = url.indexOf('?', hostEnd);
         if (questionMark > 0) {
             return url.substring(hostEnd + 1, questionMark);
@@ -62,7 +75,22 @@ public class DatabaseInitializer implements ApplicationListener<ApplicationEnvir
 
     private String extractServerUrl(String url) {
         // jdbc:mysql://localhost:3306/paiswitch?params -> jdbc:mysql://localhost:3306
-        int hostEnd = url.indexOf('/', url.indexOf("//") + 2);
+        int hostEnd = findDatabasePathStart(url);
+        if (hostEnd < 0) {
+            return null;
+        }
         return url.substring(0, hostEnd);
+    }
+
+    private boolean isMySqlJdbcUrl(String url) {
+        return url != null && url.startsWith(MYSQL_JDBC_PREFIX);
+    }
+
+    private int findDatabasePathStart(String url) {
+        int schemeEnd = url.indexOf("//");
+        if (schemeEnd < 0) {
+            return -1;
+        }
+        return url.indexOf('/', schemeEnd + 2);
     }
 }

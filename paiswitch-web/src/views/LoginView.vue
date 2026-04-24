@@ -25,8 +25,10 @@ async function handleSubmit() {
       await authStore.register(username.value, email.value, password.value)
     }
 
-    const redirect = route.query.redirect as string
-    router.push(redirect || '/')
+    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : undefined
+    const target = redirect && router.resolve(redirect).matched.length > 0 ? redirect : '/'
+
+    router.push(target)
   } catch (e: unknown) {
     const err = e as { response?: { data?: { message?: string } } }
     error.value = err.response?.data?.message || '操作失败，请重试'

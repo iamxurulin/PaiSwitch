@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useProviderStore } from '@/stores/provider'
 import { useToastStore } from '@/stores/toast'
+import type { ProviderInfo } from '@/types'
 
 function getHostname(baseUrl?: string): string {
   if (!baseUrl) return ''
@@ -15,6 +16,19 @@ function getHostname(baseUrl?: string): string {
 
 const providerStore = useProviderStore()
 const toastStore = useToastStore()
+
+function isOfficialClaude(provider: ProviderInfo): boolean {
+  return provider.code === 'claude'
+}
+
+function providerSubtitle(provider?: ProviderInfo | null): string {
+  if (!provider) return '-'
+  return isOfficialClaude(provider) ? '官方登录' : provider.modelName
+}
+
+function isProviderSwitchable(provider: ProviderInfo): boolean {
+  return !!provider.hasApiKey || isOfficialClaude(provider)
+}
 
 const stats = computed(() => {
   const total = providerStore.providers.length
@@ -42,6 +56,9 @@ const sortedProviders = computed(() => {
     if (a.hasApiKey && !b.hasApiKey) return -1
     if (!a.hasApiKey && b.hasApiKey) return 1
 
+    if (isOfficialClaude(a) && !isOfficialClaude(b)) return -1
+    if (!isOfficialClaude(a) && isOfficialClaude(b)) return 1
+
     // Default order is what's stored
     return 0
   })
@@ -49,8 +66,8 @@ const sortedProviders = computed(() => {
   return providers
 })
 
-const sortedProvidersWithKey = computed(() => {
-  return sortedProviders.value.filter(p => p.hasApiKey)
+const quickSwitchProviders = computed(() => {
+  return sortedProviders.value.filter(isProviderSwitchable)
 })
 
 async function handleQuickSwitch(providerCode: string) {
@@ -80,7 +97,7 @@ async function handleQuickSwitch(providerCode: string) {
               {{ currentProvider?.name || '-' }}
             </div>
             <div v-if="currentProvider" class="text-xs text-gray-400 mt-1 font-mono truncate max-w-[180px]">
-              {{ currentProvider.modelName }}
+              {{ providerSubtitle(currentProvider) }}
             </div>
           </div>
           <div class="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center text-2xl">
@@ -119,18 +136,18 @@ async function handleQuickSwitch(providerCode: string) {
       <h3 class="text-xl font-semibold text-gray-900 mb-4">快速切换</h3>
       <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
         <button
-          v-for="provider in sortedProvidersWithKey"
+          v-for="provider in quickSwitchProviders"
           :key="provider.code"
           @click="handleQuickSwitch(provider.code)"
           class="p-4 border border-gray-200 rounded-xl hover:border-gray-900 hover:bg-gray-50 transition-all duration-200 hover:shadow-md text-left cursor-pointer"
           :class="{ 'border-gray-900 bg-gray-50 shadow-md': currentProvider?.code === provider.code }"
         >
           <div class="font-medium text-gray-900 truncate">{{ provider.name }}</div>
-          <div class="text-xs text-gray-500 mt-1 font-mono truncate">{{ provider.modelName }}</div>
+          <div class="text-xs text-gray-500 mt-1 font-mono truncate">{{ providerSubtitle(provider) }}</div>
         </button>
       </div>
-      <div v-if="sortedProvidersWithKey.length === 0" class="text-center py-10 text-gray-500">
-        暂无已配置的模型，请先到模型管理添加 API Key
+      <div v-if="quickSwitchProviders.length === 0" class="text-center py-10 text-gray-500">
+        暂无可切换的模型，请先到模型管理添加 API Key 或使用 Claude 官方登录
       </div>
     </div>
 
@@ -148,7 +165,7 @@ async function handleQuickSwitch(providerCode: string) {
           <div class="min-w-0">
             <div class="font-medium text-gray-900 text-lg truncate">{{ provider.name }}</div>
             <div class="flex flex-wrap items-center gap-4 mt-1">
-              <span class="text-sm text-gray-500 font-mono truncate max-w-[200px]">{{ provider.modelName }}</span>
+              <span class="text-sm text-gray-500 font-mono truncate max-w-[200px]">{{ providerSubtitle(provider) }}</span>
               <span v-if="getHostname(provider.baseUrl)" class="text-xs text-gray-400">
                 {{ getHostname(provider.baseUrl) }}
               </span>
@@ -160,6 +177,12 @@ async function handleQuickSwitch(providerCode: string) {
               class="px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-medium rounded-full"
             >
               已配置
+            </span>
+            <span
+              v-else-if="isOfficialClaude(provider)"
+              class="px-3 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded-full"
+            >
+              官方登录
             </span>
             <span
               v-else

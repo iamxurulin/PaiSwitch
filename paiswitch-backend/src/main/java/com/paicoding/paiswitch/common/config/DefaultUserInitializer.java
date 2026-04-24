@@ -23,6 +23,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class DefaultUserInitializer implements CommandLineRunner {
 
+    private static final String CLAUDE_BASE_URL = "https://api.anthropic.com";
+
     private final UserRepository userRepository;
     private final UserConfigRepository userConfigRepository;
     private final ModelProviderRepository modelProviderRepository;
@@ -34,9 +36,57 @@ public class DefaultUserInitializer implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
+        ensureBuiltinProvidersExist();
         // Sync settings.json to database before creating user
         syncLocalConfigToDatabase();
         createDefaultUserIfNotExists();
+    }
+
+    private void ensureBuiltinProvidersExist() {
+        createBuiltinProviderIfMissing("claude", "Claude (Official)",
+                "Anthropic Claude official API",
+                CLAUDE_BASE_URL,
+                "claude-sonnet-4-20250514",
+                "claude-3-5-haiku-latest",
+                1);
+        createBuiltinProviderIfMissing("deepseek", "DeepSeek V3",
+                "DeepSeek AI model with Anthropic compatible API",
+                "https://api.deepseek.com/anthropic",
+                "deepseek-chat",
+                null,
+                2);
+        createBuiltinProviderIfMissing("zhipu", "Zhipu AI",
+                "Zhipu GLM model with Anthropic compatible API",
+                "https://open.bigmodel.cn/api/anthropic",
+                "glm-4.5",
+                "glm-4.5-air",
+                3);
+        createBuiltinProviderIfMissing("openrouter", "OpenRouter",
+                "OpenRouter multi-model gateway",
+                "https://openrouter.ai/api",
+                "anthropic/claude-sonnet-4",
+                "anthropic/claude-3-haiku",
+                4);
+    }
+
+    private void createBuiltinProviderIfMissing(String code, String name, String description, String baseUrl,
+                                                String modelName, String modelNameSmall, int sortOrder) {
+        if (modelProviderRepository.existsByCode(code)) {
+            return;
+        }
+
+        modelProviderRepository.save(ModelProvider.builder()
+                .code(code)
+                .name(name)
+                .description(description)
+                .baseUrl(baseUrl)
+                .modelName(modelName)
+                .modelNameSmall(modelNameSmall)
+                .isBuiltin(true)
+                .isActive(true)
+                .sortOrder(sortOrder)
+                .build());
+        log.info("Created missing built-in provider: {}", code);
     }
 
     private void syncLocalConfigToDatabase() {

@@ -25,7 +25,8 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class SettingsWriterService {
 
-    private static final String CONFIG_PATH = System.getProperty("user.home") + "/.claude/settings.json";
+    private static final String SETTINGS_PATH_PROPERTY = "paiswitch.settings.path";
+    private static final String SETTINGS_MODEL_KEY = "model";
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final ApiKeyRepository apiKeyRepository;
@@ -39,7 +40,7 @@ public class SettingsWriterService {
      */
     public void writeToSettings(Long userId, ModelProvider provider) {
         try {
-            Path path = Paths.get(CONFIG_PATH);
+            Path path = resolveConfigPath();
 
             // Read existing config or create new
             ObjectNode root;
@@ -58,18 +59,18 @@ public class SettingsWriterService {
                 root.set("env", env);
             }
 
-            // Clear previous provider-specific env vars
-            clearProviderEnvVars(env);
+            // Clear previous provider-specific config before writing the next target provider.
+            clearProviderConfig(root, env);
 
             // Set new provider configuration
             String providerCode = provider.getCode();
 
             if ("claude".equals(providerCode)) {
-                // For Claude official, just remove third-party env vars
-                log.info("Writing Claude official config - removing third-party env vars");
+                // Claude official mode should not keep a pinned top-level model when switching back.
+                log.info("Writing Claude official config without pinned top-level model");
             } else {
                 // Set base URL for third-party providers
-                env.put("ANTHROPIC_BASE_URL", provider.getBaseUrl());
+                env.put("ANTHROPIC_BASE_URL", normalizeClaudeCodeBaseUrl(provider.getBaseUrl()));
 
                 // Set model names
                 if (provider.getModelName() != null && !provider.getModelName().isBlank()) {
@@ -105,12 +106,31 @@ public class SettingsWriterService {
         }
     }
 
-    private void clearProviderEnvVars(ObjectNode env) {
+    private Path resolveConfigPath() {
+        String overridePath = System.getProperty(SETTINGS_PATH_PROPERTY);
+        if (overridePath != null && !overridePath.isBlank()) {
+            return Paths.get(overridePath);
+        }
+
+        return Paths.get(System.getProperty("user.home"), ".claude", "settings.json");
+    }
+
+    private void clearProviderConfig(ObjectNode root, ObjectNode env) {
+        root.remove(SETTINGS_MODEL_KEY);
         env.remove("ANTHROPIC_BASE_URL");
         env.remove("ANTHROPIC_API_KEY");
         env.remove("ANTHROPIC_AUTH_TOKEN");
         env.remove("ANTHROPIC_MODEL");
         env.remove("ANTHROPIC_SMALL_FAST_MODEL");
+    }
+
+    private String normalizeClaudeCodeBaseUrl(String baseUrl) {
+        if (baseUrl == null) {
+            return null;
+        }
+
+        String normalized = baseUrl.trim().replaceAll("/+$", "");
+        return normalized.replaceAll("/v1$", "");
     }
 
     private void createBackup(Path path) throws IOException {

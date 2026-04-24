@@ -213,6 +213,9 @@ npm run dev
 
 切换模型时，工具会自动修改此文件。
 
+注意：对 Anthropic 兼容服务，`ANTHROPIC_BASE_URL` 应填写服务根地址，不要手动带尾部 `/v1`。
+Claude Code 会自行请求 `/v1/messages`，如果配置成 `https://example.com/v1`，最终会变成 `/v1/v1/messages`。
+
 ### 环境变量
 
 | 变量名 | 描述 | 默认值 |

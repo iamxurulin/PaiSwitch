@@ -93,6 +93,10 @@ function getHostname(baseUrl?: string): string {
   }
 }
 
+function isOfficialClaude(provider: ProviderInfo): boolean {
+  return provider.code === 'claude'
+}
+
 function openCreateModal() {
   customForm.value = {
     name: '',
@@ -334,6 +338,12 @@ async function deleteKey(providerCode: string) {
             class="px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-medium rounded-full"
           >
             已配置
+          </span>
+          <span
+            v-else-if="isOfficialClaude(provider)"
+            class="px-3 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded-full"
+          >
+            官方登录
           </span>
           <span
             v-else
