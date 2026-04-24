@@ -67,7 +67,7 @@ public class AiChatService {
 
             可用的模型提供商：
             - claude: Claude (Anthropic 官方)
-            - deepseek: DeepSeek V3
+            - deepseek: DeepSeek
             - zhipu: 智谱 AI (GLM-4.5)
             - openrouter: OpenRouter (多模型网关)
 

@@ -86,7 +86,7 @@ npm run dev
 | Base URL | 提供商 |
 |----------|--------|
 | api.anthropic.com | Claude (Official) |
-| api.deepseek.com | DeepSeek V3 |
+| api.deepseek.com | DeepSeek |
 | open.bigmodel.cn | 智谱 AI |
 | openrouter.ai | OpenRouter |
 
@@ -117,7 +117,7 @@ npm run dev
 ./model_manager.sh
 
 # 直接切换
-./switch_to_deepseek.sh    # 切换到 DeepSeek V3
+./switch_to_deepseek.sh    # 切换到 DeepSeek
 ./switch_to_zhipu.sh       # 切换到智谱 AI
 ./switch_to_claude.sh      # 切换回 Claude 官方
 ./restore_claude_config.sh # 恢复原始配置
@@ -160,7 +160,7 @@ npm run dev
 | 代码 | 名称 | 模型 | API 兼容 |
 |------|------|------|----------|
 | claude | Claude (Official) | claude-sonnet-4 | Anthropic |
-| deepseek | DeepSeek V3 | deepseek-chat | Anthropic |
+| deepseek | DeepSeek | deepseek-chat | Anthropic |
 | zhipu | 智谱 AI | glm-4.5 | Anthropic |
 | openrouter | OpenRouter | 多模型 | Anthropic |
 

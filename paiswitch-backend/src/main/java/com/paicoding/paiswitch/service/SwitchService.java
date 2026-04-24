@@ -54,9 +54,22 @@ public class SwitchService {
         ModelProvider fromProvider = config.getCurrentProvider();
 
         if (fromProvider.getId().equals(targetProvider.getId())) {
+            try {
+                settingsWriterService.writeToSettings(userId, targetProvider);
+                apiKeyService.updateLastUsedAt(userId, providerCode);
+            } catch (Exception e) {
+                log.error("Failed to refresh settings.json for user {} and provider {}: {}", userId, providerCode, e.getMessage());
+                return SwitchDto.SwitchResult.builder()
+                        .success(false)
+                        .message("Failed to refresh settings: " + e.getMessage())
+                        .currentProvider(mapToProviderInfo(fromProvider))
+                        .switchedAt(LocalDateTime.now())
+                        .build();
+            }
+
             return SwitchDto.SwitchResult.builder()
                     .success(true)
-                    .message("Already using " + targetProvider.getName())
+                    .message("Already using " + targetProvider.getName() + ", refreshed settings")
                     .currentProvider(mapToProviderInfo(targetProvider))
                     .switchedAt(LocalDateTime.now())
                     .build();

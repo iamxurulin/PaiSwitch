@@ -8,6 +8,7 @@ import com.paicoding.paiswitch.domain.entity.ModelProvider;
 import com.paicoding.paiswitch.domain.entity.User;
 import com.paicoding.paiswitch.repository.ApiKeyRepository;
 import com.paicoding.paiswitch.repository.ModelProviderRepository;
+import com.paicoding.paiswitch.repository.UserConfigRepository;
 import com.paicoding.paiswitch.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,7 +27,9 @@ public class ApiKeyService {
     private final ApiKeyRepository apiKeyRepository;
     private final UserRepository userRepository;
     private final ModelProviderRepository providerRepository;
+    private final UserConfigRepository configRepository;
     private final EncryptionService encryptionService;
+    private final SettingsWriterService settingsWriterService;
 
     @Transactional
     public ApiKeyDto.KeyInfo setApiKey(Long userId, ApiKeyDto.SetKeyRequest request) {
@@ -50,6 +53,7 @@ public class ApiKeyService {
         apiKey.setIsValid(true);
 
         apiKey = apiKeyRepository.save(apiKey);
+        syncSettingsIfCurrentProvider(userId, provider);
         log.info("Set API key for provider: {} and user: {}", provider.getCode(), userId);
 
         return mapToKeyInfo(apiKey);
@@ -88,6 +92,7 @@ public class ApiKeyService {
                 .orElseThrow(() -> new BusinessException(ResponseCode.PROVIDER_NOT_FOUND));
 
         apiKeyRepository.deleteByUserIdAndProviderId(userId, provider.getId());
+        syncSettingsIfCurrentProvider(userId, provider);
         log.info("Deleted API key for provider: {} and user: {}", providerCode, userId);
     }
 
@@ -98,6 +103,12 @@ public class ApiKeyService {
                     apiKey.setLastUsedAt(LocalDateTime.now());
                     apiKeyRepository.save(apiKey);
                 });
+    }
+
+    private void syncSettingsIfCurrentProvider(Long userId, ModelProvider provider) {
+        configRepository.findByUserId(userId)
+                .filter(config -> provider.getCode().equals(config.getCurrentProvider().getCode()))
+                .ifPresent(config -> settingsWriterService.writeToSettings(userId, provider));
     }
 
     private ApiKeyDto.KeyInfo mapToKeyInfo(ApiKey apiKey) {

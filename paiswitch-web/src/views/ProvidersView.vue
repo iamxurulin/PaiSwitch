@@ -17,12 +17,6 @@ const saving = ref(false)
 const creatingCustom = ref(false)
 const testing = ref(false)
 const testResult = ref<{ success: boolean; message: string; responseTimeMs?: number } | null>(null)
-const originalApiKey = ref('')
-const originalConfig = ref({
-  baseUrl: '',
-  modelName: '',
-  modelNameSmall: ''
-})
 
 const currentProvider = computed(() => providerStore.currentConfig?.currentProvider)
 
@@ -165,13 +159,7 @@ async function openConfigModal(provider: ProviderInfo) {
     modelName,
     modelNameSmall
   }
-  originalConfig.value = {
-    baseUrl,
-    modelName,
-    modelNameSmall
-  }
   configApiKey.value = ''
-  originalApiKey.value = ''
   showApiKey.value = false
   testResult.value = null
   showConfigModal.value = true
@@ -184,10 +172,8 @@ async function openConfigModal(provider: ProviderInfo) {
     }
     const apiKeyValue = normalizeInput(keyInfo?.apiKey)
     configApiKey.value = apiKeyValue
-    originalApiKey.value = apiKeyValue
   } catch {
     configApiKey.value = ''
-    originalApiKey.value = ''
   } finally {
     if (selectedProvider.value?.code === provider.code) {
       loadingApiKey.value = false
@@ -205,48 +191,21 @@ async function saveConfig() {
     const nextModelNameSmall = normalizeInput(configForm.value.modelNameSmall)
     const nextApiKey = normalizeInput(configApiKey.value)
 
-    const configPayload: ProviderConfigUpdateRequest = {}
-    if (nextBaseUrl !== originalConfig.value.baseUrl && nextBaseUrl) {
-      configPayload.baseUrl = nextBaseUrl
-    }
-    if (nextModelName !== originalConfig.value.modelName) {
-      configPayload.modelName = nextModelName
-    }
-    if (nextModelNameSmall !== originalConfig.value.modelNameSmall) {
-      configPayload.modelNameSmall = nextModelNameSmall
+    const configPayload: ProviderConfigUpdateRequest = {
+      baseUrl: nextBaseUrl,
+      modelName: nextModelName,
+      modelNameSmall: nextModelNameSmall
     }
 
-    const hasConfigChanges = Object.keys(configPayload).length > 0
-    const apiKeyChanged = nextApiKey !== originalApiKey.value
-    const skippedApiKeyDeletion = apiKeyChanged && !nextApiKey && !!originalApiKey.value
-    const shouldUpdateApiKey = apiKeyChanged && !!nextApiKey
-
-    if (!hasConfigChanges && !shouldUpdateApiKey) {
-      if (skippedApiKeyDeletion) {
-        toastStore.error('API Key 置空不会删除，如需删除请使用“删除”按钮')
-        return
-      }
-      toastStore.success('没有检测到配置变化')
-      return
-    }
-
-    if (hasConfigChanges) {
-      await providerStore.updateProviderConfig(selectedProvider.value.code, configPayload)
-    }
-    if (shouldUpdateApiKey) {
+    await providerStore.updateProviderConfig(selectedProvider.value.code, configPayload)
+    if (nextApiKey) {
       await providerStore.setApiKey(selectedProvider.value.code, nextApiKey)
     }
     showConfigModal.value = false
-    if (hasConfigChanges && shouldUpdateApiKey) {
+    if (nextApiKey) {
       toastStore.success(`${selectedProvider.value.name} 配置和 API Key 已更新`)
-    } else if (hasConfigChanges) {
-      if (skippedApiKeyDeletion) {
-        toastStore.success(`${selectedProvider.value.name} 配置已更新（API Key 未变更）`)
-      } else {
-        toastStore.success(`${selectedProvider.value.name} 配置已更新`)
-      }
     } else {
-      toastStore.success(`${selectedProvider.value.name} API Key 已更新`)
+      toastStore.success(`${selectedProvider.value.name} 配置已更新`)
     }
   } catch (e: unknown) {
     const err = e as { response?: { data?: { message?: string } } }

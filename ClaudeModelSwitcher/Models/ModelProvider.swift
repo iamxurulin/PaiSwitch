@@ -141,7 +141,7 @@ enum ModelProvider: String, CaseIterable, Identifiable, Codable {
         case .claude:
             return "Anthropic 官方 API"
         case .deepseek:
-            return "DeepSeek V3 - 高性价比"
+            return "DeepSeek - 高性价比"
         case .zhipu:
             return "智谱 \(defaultModel) - 国产大模型"
         case .openrouter:

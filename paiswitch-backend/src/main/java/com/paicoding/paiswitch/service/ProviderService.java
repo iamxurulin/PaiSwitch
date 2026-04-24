@@ -7,6 +7,7 @@ import com.paicoding.paiswitch.domain.entity.ApiKey;
 import com.paicoding.paiswitch.domain.entity.ModelProvider;
 import com.paicoding.paiswitch.repository.ApiKeyRepository;
 import com.paicoding.paiswitch.repository.ModelProviderRepository;
+import com.paicoding.paiswitch.repository.UserConfigRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -39,7 +40,9 @@ public class ProviderService {
 
     private final ModelProviderRepository providerRepository;
     private final ApiKeyRepository apiKeyRepository;
+    private final UserConfigRepository configRepository;
     private final EncryptionService encryptionService;
+    private final SettingsWriterService settingsWriterService;
 
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
@@ -134,8 +137,7 @@ public class ProviderService {
 
     /**
      * Update provider configuration (baseUrl, modelName, modelNameSmall).
-     * This only updates the database, does NOT sync to settings.json.
-     * The settings.json will be updated only when user switches to the model.
+     * Syncs settings.json immediately when the updated provider is currently active.
      */
     @Transactional
     public ProviderDto.ProviderInfo updateProviderConfig(Long userId, String code, ProviderDto.ConfigUpdateRequest request) {
@@ -168,8 +170,15 @@ public class ProviderService {
         }
 
         provider = providerRepository.save(provider);
+        syncSettingsIfCurrentProvider(userId, provider);
         log.info("Updated provider config: {} by user: {}, model: {}", provider.getCode(), userId, provider.getModelName());
         return mapToProviderInfo(provider);
+    }
+
+    private void syncSettingsIfCurrentProvider(Long userId, ModelProvider provider) {
+        configRepository.findByUserId(userId)
+                .filter(config -> provider.getCode().equals(config.getCurrentProvider().getCode()))
+                .ifPresent(config -> settingsWriterService.writeToSettings(userId, provider));
     }
 
     /**

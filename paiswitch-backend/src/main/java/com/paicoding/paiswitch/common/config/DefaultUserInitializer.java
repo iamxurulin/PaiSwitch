@@ -49,7 +49,7 @@ public class DefaultUserInitializer implements CommandLineRunner {
                 "claude-sonnet-4-20250514",
                 "claude-3-5-haiku-latest",
                 1);
-        createBuiltinProviderIfMissing("deepseek", "DeepSeek V3",
+        createBuiltinProviderIfMissing("deepseek", "DeepSeek",
                 "DeepSeek AI model with Anthropic compatible API",
                 "https://api.deepseek.com/anthropic",
                 "deepseek-chat",
