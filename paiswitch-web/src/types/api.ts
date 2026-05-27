@@ -21,6 +21,8 @@ export interface UserInfo {
   createdAt: string
 }
 
+export type TargetTool = 'CLAUDE_CODE' | 'CODEX'
+
 export interface ProviderInfo {
   id: number
   code: string
@@ -34,6 +36,8 @@ export interface ProviderInfo {
   sortOrder: number
   iconUrl?: string
   hasApiKey?: boolean
+  targetTool?: TargetTool
+  wireApi?: string
   createdAt: string
 }
 
@@ -86,7 +90,7 @@ export interface ApiKeyPlainInfo {
 export interface ConfigInfo {
   id: number
   userId: number
-  currentProvider: ProviderInfo
+  currentProvider: ProviderInfo | null
   apiTimeout: number
   extraConfig?: Record<string, unknown>
   updatedAt: string

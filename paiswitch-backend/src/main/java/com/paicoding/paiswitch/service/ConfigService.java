@@ -9,6 +9,7 @@ import com.paicoding.paiswitch.domain.entity.ModelProvider;
 import com.paicoding.paiswitch.domain.entity.User;
 import com.paicoding.paiswitch.domain.entity.UserConfig;
 import com.paicoding.paiswitch.domain.enums.BackupType;
+import com.paicoding.paiswitch.domain.enums.TargetTool;
 import com.paicoding.paiswitch.repository.ConfigBackupRepository;
 import com.paicoding.paiswitch.repository.ModelProviderRepository;
 import com.paicoding.paiswitch.repository.UserConfigRepository;
@@ -35,24 +36,28 @@ public class ConfigService {
     private final ConfigBackupRepository backupRepository;
 
     @Transactional(readOnly = true)
-    public ConfigDto.ConfigInfo getUserConfig(Long userId) {
+    public ConfigDto.ConfigInfo getUserConfig(Long userId, TargetTool tool) {
         UserConfig config = configRepository.findByUserId(userId)
                 .orElseThrow(() -> new BusinessException(ResponseCode.CONFIG_NOT_FOUND));
 
-        return mapToConfigInfo(config);
+        return mapToConfigInfo(config, tool);
     }
 
     @Transactional
-    public ConfigDto.ConfigInfo updateUserConfig(Long userId, ConfigDto.UpdateRequest request) {
+    public ConfigDto.ConfigInfo updateUserConfig(Long userId, ConfigDto.UpdateRequest request, TargetTool tool) {
         UserConfig config = configRepository.findByUserId(userId)
                 .orElseThrow(() -> new BusinessException(ResponseCode.CONFIG_NOT_FOUND));
 
         ModelProvider provider = providerRepository.findById(request.getProviderId())
                 .orElseThrow(() -> new BusinessException(ResponseCode.PROVIDER_NOT_FOUND));
 
-        createBackup(userId, config, BackupType.AUTO_BEFORE_SWITCH, "Auto backup before config update");
+        if (tool == TargetTool.CLAUDE_CODE) {
+            createBackup(userId, config, BackupType.AUTO_BEFORE_SWITCH, "Auto backup before config update");
+            config.setCurrentProvider(provider);
+        } else {
+            config.setCurrentCodexProvider(provider);
+        }
 
-        config.setCurrentProvider(provider);
         if (request.getApiTimeout() != null) {
             config.setApiTimeout(request.getApiTimeout());
         }
@@ -61,9 +66,9 @@ public class ConfigService {
         }
 
         config = configRepository.save(config);
-        log.info("Updated config for user: {}, provider: {}", userId, provider.getCode());
+        log.info("Updated config for user: {} ({}), provider: {}", userId, tool, provider.getCode());
 
-        return mapToConfigInfo(config);
+        return mapToConfigInfo(config, tool);
     }
 
     @Transactional
@@ -136,14 +141,17 @@ public class ConfigService {
         config = configRepository.save(config);
         log.info("Restored backup: {} for user: {}", backupId, userId);
 
-        return mapToConfigInfo(config);
+        return mapToConfigInfo(config, TargetTool.CLAUDE_CODE);
     }
 
-    private ConfigDto.ConfigInfo mapToConfigInfo(UserConfig config) {
+    private ConfigDto.ConfigInfo mapToConfigInfo(UserConfig config, TargetTool tool) {
+        ModelProvider current = tool == TargetTool.CLAUDE_CODE
+                ? config.getCurrentProvider()
+                : config.getCurrentCodexProvider();
         return ConfigDto.ConfigInfo.builder()
                 .id(config.getId())
                 .userId(config.getUser().getId())
-                .currentProvider(mapToProviderInfo(config.getCurrentProvider()))
+                .currentProvider(current == null ? null : mapToProviderInfo(current))
                 .apiTimeout(config.getApiTimeout())
                 .extraConfig(config.getExtraConfig())
                 .updatedAt(config.getUpdatedAt())
@@ -176,6 +184,8 @@ public class ConfigService {
                 .isActive(provider.getIsActive())
                 .sortOrder(provider.getSortOrder())
                 .iconUrl(provider.getIconUrl())
+                .targetTool(provider.getTargetTool() != null ? provider.getTargetTool().name() : null)
+                .wireApi(provider.getWireApi())
                 .createdAt(provider.getCreatedAt())
                 .build();
     }

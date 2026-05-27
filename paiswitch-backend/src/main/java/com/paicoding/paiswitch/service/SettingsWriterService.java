@@ -28,9 +28,12 @@ public class SettingsWriterService {
     private static final String SETTINGS_PATH_PROPERTY = "paiswitch.settings.path";
     private static final String SETTINGS_MODEL_KEY = "model";
 
+    private static final String OPENAI_WIRE_API = "openai";
+
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final ApiKeyRepository apiKeyRepository;
     private final EncryptionService encryptionService;
+    private final com.paicoding.paiswitch.proxy.ProxyEndpointResolver proxyEndpointResolver;
 
     /**
      * Write provider configuration to settings.json.
@@ -69,8 +72,15 @@ public class SettingsWriterService {
                 // Claude official mode should not keep a pinned top-level model when switching back.
                 log.info("Writing Claude official config without pinned top-level model");
             } else {
-                // Set base URL for third-party providers
-                env.put("ANTHROPIC_BASE_URL", normalizeClaudeCodeBaseUrl(provider.getBaseUrl()));
+                // Third-party provider. If wire_api='openai', the upstream speaks
+                // OpenAI chat-completions, not Anthropic Messages — point Claude
+                // Code at the local /claude-proxy/{code} which translates both
+                // ways (in particular maps usage.prompt_tokens → input_tokens so
+                // Claude Code doesn't crash on `_.input_tokens`).
+                String baseUrl = needsProxy(provider)
+                        ? proxyEndpointResolver.getProxyBaseUrl() + "/claude-proxy/" + providerCode
+                        : normalizeClaudeCodeBaseUrl(provider.getBaseUrl());
+                env.put("ANTHROPIC_BASE_URL", baseUrl);
 
                 // Set model names
                 if (provider.getModelName() != null && !provider.getModelName().isBlank()) {
@@ -122,6 +132,11 @@ public class SettingsWriterService {
         env.remove("ANTHROPIC_AUTH_TOKEN");
         env.remove("ANTHROPIC_MODEL");
         env.remove("ANTHROPIC_SMALL_FAST_MODEL");
+    }
+
+    private boolean needsProxy(ModelProvider provider) {
+        String wireApi = provider.getWireApi();
+        return wireApi != null && OPENAI_WIRE_API.equalsIgnoreCase(wireApi.trim());
     }
 
     private String normalizeClaudeCodeBaseUrl(String baseUrl) {

@@ -8,6 +8,7 @@ import com.paicoding.paiswitch.domain.dto.UserDto;
 import com.paicoding.paiswitch.domain.entity.ModelProvider;
 import com.paicoding.paiswitch.domain.entity.User;
 import com.paicoding.paiswitch.domain.entity.UserConfig;
+import com.paicoding.paiswitch.domain.enums.TargetTool;
 import com.paicoding.paiswitch.domain.enums.UserStatus;
 import com.paicoding.paiswitch.repository.ModelProviderRepository;
 import com.paicoding.paiswitch.repository.UserConfigRepository;
@@ -47,7 +48,7 @@ public class AuthService {
 
         user = userRepository.save(user);
 
-        ModelProvider defaultProvider = modelProviderRepository.findByCode("claude")
+        ModelProvider defaultProvider = modelProviderRepository.findByCodeAndTargetTool("claude", TargetTool.CLAUDE_CODE)
                 .orElseThrow(() -> new BusinessException(ResponseCode.PROVIDER_NOT_FOUND, "Default provider not found"));
 
         UserConfig config = UserConfig.builder()

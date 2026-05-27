@@ -3,6 +3,7 @@ package com.paicoding.paiswitch.controller;
 import com.paicoding.paiswitch.common.response.ApiResponse;
 import com.paicoding.paiswitch.common.security.JwtTokenProvider;
 import com.paicoding.paiswitch.domain.dto.ConfigDto;
+import com.paicoding.paiswitch.domain.enums.TargetTool;
 import com.paicoding.paiswitch.service.ConfigService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -24,18 +25,20 @@ public class ConfigController {
     @Operation(summary = "Get current user configuration")
     @GetMapping
     public ApiResponse<ConfigDto.ConfigInfo> getConfig(
-            @RequestHeader("Authorization") String authorization) {
+            @RequestHeader("Authorization") String authorization,
+            @RequestParam(required = false) String tool) {
         Long userId = extractUserId(authorization);
-        return ApiResponse.success(configService.getUserConfig(userId));
+        return ApiResponse.success(configService.getUserConfig(userId, TargetTool.fromQueryParam(tool)));
     }
 
     @Operation(summary = "Update user configuration")
     @PutMapping
     public ApiResponse<ConfigDto.ConfigInfo> updateConfig(
             @RequestHeader("Authorization") String authorization,
+            @RequestParam(required = false) String tool,
             @Valid @RequestBody ConfigDto.UpdateRequest request) {
         Long userId = extractUserId(authorization);
-        return ApiResponse.success(configService.updateUserConfig(userId, request));
+        return ApiResponse.success(configService.updateUserConfig(userId, request, TargetTool.fromQueryParam(tool)));
     }
 
     @Operation(summary = "Get configuration backups")

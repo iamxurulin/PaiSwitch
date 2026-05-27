@@ -40,6 +40,7 @@ public class LocalConfigController {
         var result = switchService.switchToProvider(
                 userId,
                 localConfig.providerCode(),
+                com.paicoding.paiswitch.domain.enums.TargetTool.CLAUDE_CODE,
                 com.paicoding.paiswitch.domain.enums.SwitchType.MANUAL,
                 null,
                 "sync_from_local"

@@ -2,7 +2,6 @@ package com.paicoding.paiswitch.service;
 
 import com.paicoding.paiswitch.common.exception.BusinessException;
 import com.paicoding.paiswitch.common.response.ResponseCode;
-import com.paicoding.paiswitch.domain.dto.ConfigDto;
 import com.paicoding.paiswitch.domain.dto.ProviderDto;
 import com.paicoding.paiswitch.domain.dto.SwitchDto;
 import com.paicoding.paiswitch.domain.entity.ModelProvider;
@@ -11,6 +10,7 @@ import com.paicoding.paiswitch.domain.entity.User;
 import com.paicoding.paiswitch.domain.entity.UserConfig;
 import com.paicoding.paiswitch.domain.enums.BackupType;
 import com.paicoding.paiswitch.domain.enums.SwitchType;
+import com.paicoding.paiswitch.domain.enums.TargetTool;
 import com.paicoding.paiswitch.repository.ModelProviderRepository;
 import com.paicoding.paiswitch.repository.SwitchHistoryRepository;
 import com.paicoding.paiswitch.repository.UserConfigRepository;
@@ -34,14 +34,15 @@ public class SwitchService {
     private final ConfigService configService;
     private final ApiKeyService apiKeyService;
     private final SettingsWriterService settingsWriterService;
+    private final CodexSettingsWriterService codexSettingsWriterService;
 
     @Transactional
-    public SwitchDto.SwitchResult switchToProvider(Long userId, String providerCode, SwitchType switchType,
-                                                     String aiPrompt, String clientInfo) {
+    public SwitchDto.SwitchResult switchToProvider(Long userId, String providerCode, TargetTool tool,
+                                                   SwitchType switchType, String aiPrompt, String clientInfo) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ResponseCode.USER_NOT_FOUND));
 
-        ModelProvider targetProvider = providerRepository.findByCode(providerCode)
+        ModelProvider targetProvider = providerRepository.findByCodeAndTargetTool(providerCode, tool)
                 .orElseThrow(() -> new BusinessException(ResponseCode.PROVIDER_NOT_FOUND));
 
         if (!targetProvider.getIsActive()) {
@@ -51,14 +52,15 @@ public class SwitchService {
         UserConfig config = configRepository.findByUserId(userId)
                 .orElseThrow(() -> new BusinessException(ResponseCode.CONFIG_NOT_FOUND));
 
-        ModelProvider fromProvider = config.getCurrentProvider();
+        ModelProvider fromProvider = currentProviderForTool(config, tool);
 
-        if (fromProvider.getId().equals(targetProvider.getId())) {
+        boolean alreadyCurrent = fromProvider != null && fromProvider.getId().equals(targetProvider.getId());
+        if (alreadyCurrent) {
             try {
-                settingsWriterService.writeToSettings(userId, targetProvider);
-                apiKeyService.updateLastUsedAt(userId, providerCode);
+                writeSettingsForTool(userId, targetProvider, tool);
+                apiKeyService.updateLastUsedAt(userId, providerCode, tool);
             } catch (Exception e) {
-                log.error("Failed to refresh settings.json for user {} and provider {}: {}", userId, providerCode, e.getMessage());
+                log.error("Failed to refresh settings for user {} tool {} provider {}: {}", userId, tool, providerCode, e.getMessage());
                 return SwitchDto.SwitchResult.builder()
                         .success(false)
                         .message("Failed to refresh settings: " + e.getMessage())
@@ -75,8 +77,11 @@ public class SwitchService {
                     .build();
         }
 
-        configService.createBackup(userId, config, BackupType.AUTO_BEFORE_SWITCH,
-                "Auto backup before switching to " + targetProvider.getName());
+        // Backup is currently tied to current_provider_id (Claude). Skip for Codex to avoid FK confusion.
+        if (tool == TargetTool.CLAUDE_CODE) {
+            configService.createBackup(userId, config, BackupType.AUTO_BEFORE_SWITCH,
+                    "Auto backup before switching to " + targetProvider.getName());
+        }
 
         SwitchHistory history = SwitchHistory.builder()
                 .user(user)
@@ -88,18 +93,22 @@ public class SwitchService {
                 .build();
 
         try {
-            config.setCurrentProvider(targetProvider);
+            if (tool == TargetTool.CLAUDE_CODE) {
+                config.setCurrentProvider(targetProvider);
+            } else {
+                config.setCurrentCodexProvider(targetProvider);
+            }
             configRepository.save(config);
 
-            apiKeyService.updateLastUsedAt(userId, providerCode);
+            apiKeyService.updateLastUsedAt(userId, providerCode, tool);
 
-            // Write to settings.json with latest provider config from database
-            settingsWriterService.writeToSettings(userId, targetProvider);
+            writeSettingsForTool(userId, targetProvider, tool);
 
             history.setSuccess(true);
             switchHistoryRepository.save(history);
 
-            log.info("Switched user {} from {} to {}", userId, fromProvider.getCode(), providerCode);
+            log.info("Switched user {} ({}) from {} to {}", userId, tool,
+                    fromProvider == null ? "<none>" : fromProvider.getCode(), providerCode);
 
             return SwitchDto.SwitchResult.builder()
                     .success(true)
@@ -113,7 +122,7 @@ public class SwitchService {
             history.setErrorMessage(e.getMessage());
             switchHistoryRepository.save(history);
 
-            log.error("Failed to switch user {} to {}: {}", userId, providerCode, e.getMessage());
+            log.error("Failed to switch user {} ({}) to {}: {}", userId, tool, providerCode, e.getMessage());
 
             return SwitchDto.SwitchResult.builder()
                     .success(false)
@@ -125,11 +134,24 @@ public class SwitchService {
     }
 
     @Transactional
-    public SwitchDto.SwitchResult switchToProvider(Long userId, SwitchDto.SwitchRequest request) {
-        return switchToProvider(userId, request.getProviderCode(), SwitchType.MANUAL, null, request.getClientInfo());
+    public SwitchDto.SwitchResult switchToProvider(Long userId, SwitchDto.SwitchRequest request, TargetTool tool) {
+        return switchToProvider(userId, request.getProviderCode(), tool, SwitchType.MANUAL, null, request.getClientInfo());
+    }
+
+    private ModelProvider currentProviderForTool(UserConfig config, TargetTool tool) {
+        return tool == TargetTool.CLAUDE_CODE ? config.getCurrentProvider() : config.getCurrentCodexProvider();
+    }
+
+    private void writeSettingsForTool(Long userId, ModelProvider provider, TargetTool tool) {
+        if (tool == TargetTool.CLAUDE_CODE) {
+            settingsWriterService.writeToSettings(userId, provider);
+        } else {
+            codexSettingsWriterService.writeToSettings(userId, provider);
+        }
     }
 
     private ProviderDto.ProviderInfo mapToProviderInfo(ModelProvider provider) {
+        if (provider == null) return null;
         return ProviderDto.ProviderInfo.builder()
                 .id(provider.getId())
                 .code(provider.getCode())
@@ -142,6 +164,8 @@ public class SwitchService {
                 .isActive(provider.getIsActive())
                 .sortOrder(provider.getSortOrder())
                 .iconUrl(provider.getIconUrl())
+                .targetTool(provider.getTargetTool() != null ? provider.getTargetTool().name() : null)
+                .wireApi(provider.getWireApi())
                 .createdAt(provider.getCreatedAt())
                 .build();
     }

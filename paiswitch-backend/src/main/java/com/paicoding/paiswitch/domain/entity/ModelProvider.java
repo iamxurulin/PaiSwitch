@@ -1,5 +1,6 @@
 package com.paicoding.paiswitch.domain.entity;
 
+import com.paicoding.paiswitch.domain.enums.TargetTool;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -19,7 +20,7 @@ public class ModelProvider {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true, length = 50)
+    @Column(nullable = false, length = 50)
     private String code;
 
     @Column(nullable = false, length = 100)
@@ -51,6 +52,19 @@ public class ModelProvider {
 
     @Column(name = "icon_url", length = 500)
     private String iconUrl;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "target_tool", nullable = false, length = 20)
+    @Builder.Default
+    private TargetTool targetTool = TargetTool.CLAUDE_CODE;
+
+    /** Codex-only: "responses" or "chat". Null for Claude providers. */
+    @Column(name = "wire_api", length = 20)
+    private String wireApi;
+
+    /** Codex-only: TOML [model_providers.<key>] identifier. Null for Claude providers. */
+    @Column(name = "provider_key", length = 50)
+    private String providerKey;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

@@ -28,6 +28,8 @@ public class ProviderDto {
         private Integer sortOrder;
         private String iconUrl;
         private Boolean hasApiKey;
+        private String targetTool;
+        private String wireApi;
         private LocalDateTime createdAt;
     }
 

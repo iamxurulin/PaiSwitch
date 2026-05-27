@@ -88,7 +88,7 @@ function getHostname(baseUrl?: string): string {
 }
 
 function isOfficialClaude(provider: ProviderInfo): boolean {
-  return provider.code === 'claude'
+  return provider.code === 'claude' && providerStore.activeTool === 'CLAUDE_CODE'
 }
 
 function openCreateModal() {

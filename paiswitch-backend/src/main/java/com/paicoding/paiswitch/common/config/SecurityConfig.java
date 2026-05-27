@@ -42,6 +42,11 @@ public class SecurityConfig {
                         .requestMatchers("/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/providers").permitAll()
+                        // Codex local proxy: localhost-only, authenticates via forwarded provider Bearer.
+                        .requestMatchers("/codex-proxy/**").permitAll()
+                        // Claude Code local proxy: same model — Claude Code forwards its x-api-key
+                        // (the upstream provider token) and we proxy it on to apifree.ai etc.
+                        .requestMatchers("/claude-proxy/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

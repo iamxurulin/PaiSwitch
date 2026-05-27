@@ -95,6 +95,7 @@ public class AiChatService {
             SwitchDto.SwitchResult switchResult = switchService.switchToProvider(
                     userId,
                     quickSwitchCommand.providerCode(),
+                    com.paicoding.paiswitch.domain.enums.TargetTool.CLAUDE_CODE,
                     SwitchType.AI_NATURAL_LANGUAGE,
                     request.getPrompt(),
                     request.getClientInfo()
@@ -113,7 +114,8 @@ public class AiChatService {
                 .orElseThrow(() -> new BusinessException(ResponseCode.CONFIG_NOT_FOUND));
 
         ModelProvider provider = config.getCurrentProvider();
-        String apiKey = apiKeyService.getDecryptedApiKey(userId, provider.getCode());
+        String apiKey = apiKeyService.getDecryptedApiKey(userId, provider.getCode(),
+                com.paicoding.paiswitch.domain.enums.TargetTool.CLAUDE_CODE);
 
         try {
             String aiResponse;
@@ -165,6 +167,7 @@ public class AiChatService {
         SwitchDto.SwitchResult switchResult = switchService.switchToProvider(
                 userId,
                 command.providerCode(),
+                com.paicoding.paiswitch.domain.enums.TargetTool.CLAUDE_CODE,
                 SwitchType.AI_NATURAL_LANGUAGE,
                 request.getPrompt(),
                 request.getClientInfo()

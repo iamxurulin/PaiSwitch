@@ -5,6 +5,7 @@ import com.paicoding.paiswitch.common.response.ResponseCode;
 import com.paicoding.paiswitch.domain.dto.ProviderDto;
 import com.paicoding.paiswitch.domain.entity.ApiKey;
 import com.paicoding.paiswitch.domain.entity.ModelProvider;
+import com.paicoding.paiswitch.domain.enums.TargetTool;
 import com.paicoding.paiswitch.repository.ApiKeyRepository;
 import com.paicoding.paiswitch.repository.ModelProviderRepository;
 import com.paicoding.paiswitch.repository.UserConfigRepository;
@@ -43,55 +44,43 @@ public class ProviderService {
     private final UserConfigRepository configRepository;
     private final EncryptionService encryptionService;
     private final SettingsWriterService settingsWriterService;
+    private final CodexSettingsWriterService codexSettingsWriterService;
 
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
             .build();
 
     @Transactional(readOnly = true)
-    public List<ProviderDto.ProviderInfo> getAllProviders() {
-        return providerRepository.findByIsActiveTrueOrderBySortOrderAsc().stream()
+    public List<ProviderDto.ProviderInfo> getAllProviders(TargetTool tool) {
+        return providerRepository.findByTargetToolAndIsActiveTrueOrderBySortOrderAsc(tool).stream()
                 .map(this::mapToProviderInfo)
                 .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
-    public List<ProviderDto.ProviderInfo> getProvidersForUser(Long userId) {
-        List<ModelProvider> providers = providerRepository.findByIsActiveTrueOrderBySortOrderAsc();
+    public List<ProviderDto.ProviderInfo> getProvidersForUser(Long userId, TargetTool tool) {
+        List<ModelProvider> providers = providerRepository.findByTargetToolAndIsActiveTrueOrderBySortOrderAsc(tool);
         return providers.stream()
                 .map(provider -> {
                     ProviderDto.ProviderInfo info = mapToProviderInfo(provider);
                     boolean hasApiKey = apiKeyRepository.existsByUserIdAndProviderId(userId, provider.getId());
-                    return ProviderDto.ProviderInfo.builder()
-                            .id(info.getId())
-                            .code(info.getCode())
-                            .name(info.getName())
-                            .description(info.getDescription())
-                            .baseUrl(info.getBaseUrl())
-                            .modelName(info.getModelName())
-                            .modelNameSmall(info.getModelNameSmall())
-                            .isBuiltin(info.getIsBuiltin())
-                            .isActive(info.getIsActive())
-                            .sortOrder(info.getSortOrder())
-                            .iconUrl(info.getIconUrl())
-                            .hasApiKey(hasApiKey)
-                            .createdAt(info.getCreatedAt())
-                            .build();
+                    info.setHasApiKey(hasApiKey);
+                    return info;
                 })
                 .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
-    public ProviderDto.ProviderInfo getProviderByCode(String code) {
-        ModelProvider provider = providerRepository.findByCode(code)
+    public ProviderDto.ProviderInfo getProviderByCode(String code, TargetTool tool) {
+        ModelProvider provider = providerRepository.findByCodeAndTargetTool(code, tool)
                 .orElseThrow(() -> new BusinessException(ResponseCode.PROVIDER_NOT_FOUND));
         return mapToProviderInfo(provider);
     }
 
     @Transactional
-    public ProviderDto.ProviderInfo createCustomProvider(Long userId, ProviderDto.CreateRequest request) {
+    public ProviderDto.ProviderInfo createCustomProvider(Long userId, ProviderDto.CreateRequest request, TargetTool tool) {
         String code = sanitizeCode(request.getCode());
-        if (providerRepository.existsByCode(code)) {
+        if (providerRepository.existsByCodeAndTargetTool(code, tool)) {
             throw new BusinessException(ResponseCode.PROVIDER_ALREADY_EXISTS);
         }
 
@@ -106,16 +95,19 @@ public class ProviderService {
                 .isBuiltin(false)
                 .isActive(true)
                 .sortOrder(100)
+                .targetTool(tool)
+                .wireApi(tool == TargetTool.CODEX ? "chat" : null)
+                .providerKey(tool == TargetTool.CODEX ? "custom_" + code : null)
                 .build();
 
         provider = providerRepository.save(provider);
-        log.info("Created custom provider: {} for user: {}", provider.getCode(), userId);
+        log.info("Created custom provider: {} ({}) for user: {}", provider.getCode(), tool, userId);
         return mapToProviderInfo(provider);
     }
 
     @Transactional
-    public ProviderDto.ProviderInfo updateProvider(Long userId, String code, ProviderDto.UpdateRequest request) {
-        ModelProvider provider = providerRepository.findByCode(code)
+    public ProviderDto.ProviderInfo updateProvider(Long userId, String code, TargetTool tool, ProviderDto.UpdateRequest request) {
+        ModelProvider provider = providerRepository.findByCodeAndTargetTool(code, tool)
                 .orElseThrow(() -> new BusinessException(ResponseCode.PROVIDER_NOT_FOUND));
 
         if (provider.getIsBuiltin()) {
@@ -131,24 +123,25 @@ public class ProviderService {
         if (request.getIconUrl() != null) provider.setIconUrl(sanitizeOptionalText(request.getIconUrl()));
 
         provider = providerRepository.save(provider);
-        log.info("Updated provider: {} by user: {}", provider.getCode(), userId);
+        log.info("Updated provider: {} ({}) by user: {}", provider.getCode(), tool, userId);
         return mapToProviderInfo(provider);
     }
 
     /**
      * Update provider configuration (baseUrl, modelName, modelNameSmall).
-     * Syncs settings.json immediately when the updated provider is currently active.
+     * Syncs the corresponding settings file when the updated provider is currently active.
      */
     @Transactional
-    public ProviderDto.ProviderInfo updateProviderConfig(Long userId, String code, ProviderDto.ConfigUpdateRequest request) {
-        ModelProvider provider = providerRepository.findByCode(code)
+    public ProviderDto.ProviderInfo updateProviderConfig(Long userId, String code, TargetTool tool, ProviderDto.ConfigUpdateRequest request) {
+        ModelProvider provider = providerRepository.findByCodeAndTargetTool(code, tool)
                 .orElseThrow(() -> new BusinessException(ResponseCode.PROVIDER_NOT_FOUND));
 
         String sanitizedBaseUrl = sanitizeOptionalText(request.getBaseUrl());
         String sanitizedModelName = sanitizeOptionalText(request.getModelName());
         String sanitizedModelNameSmall = sanitizeOptionalText(request.getModelNameSmall());
 
-        if (CLAUDE_PROVIDER_CODE.equals(code)) {
+        boolean isClaudeOfficial = tool == TargetTool.CLAUDE_CODE && CLAUDE_PROVIDER_CODE.equals(code);
+        if (isClaudeOfficial) {
             if (!CLAUDE_OFFICIAL_BASE_URL.equals(provider.getBaseUrl())) {
                 provider.setBaseUrl(CLAUDE_OFFICIAL_BASE_URL);
             }
@@ -162,31 +155,39 @@ public class ProviderService {
             provider.setBaseUrl(sanitizedBaseUrl);
         }
 
-        if (!CLAUDE_PROVIDER_CODE.equals(code) && request.getModelName() != null) {
+        if (!isClaudeOfficial && request.getModelName() != null) {
             provider.setModelName(sanitizedModelName == null ? "" : sanitizedModelName);
         }
-        if (!CLAUDE_PROVIDER_CODE.equals(code) && request.getModelNameSmall() != null) {
+        if (!isClaudeOfficial && request.getModelNameSmall() != null) {
             provider.setModelNameSmall(sanitizedModelNameSmall == null || sanitizedModelNameSmall.isEmpty() ? null : sanitizedModelNameSmall);
         }
 
         provider = providerRepository.save(provider);
         syncSettingsIfCurrentProvider(userId, provider);
-        log.info("Updated provider config: {} by user: {}, model: {}", provider.getCode(), userId, provider.getModelName());
+        log.info("Updated provider config: {} ({}) by user: {}, model: {}", provider.getCode(), tool, userId, provider.getModelName());
         return mapToProviderInfo(provider);
     }
 
     private void syncSettingsIfCurrentProvider(Long userId, ModelProvider provider) {
-        configRepository.findByUserId(userId)
-                .filter(config -> provider.getCode().equals(config.getCurrentProvider().getCode()))
-                .ifPresent(config -> settingsWriterService.writeToSettings(userId, provider));
+        configRepository.findByUserId(userId).ifPresent(config -> {
+            if (provider.getTargetTool() == TargetTool.CLAUDE_CODE
+                    && config.getCurrentProvider() != null
+                    && provider.getId().equals(config.getCurrentProvider().getId())) {
+                settingsWriterService.writeToSettings(userId, provider);
+            } else if (provider.getTargetTool() == TargetTool.CODEX
+                    && config.getCurrentCodexProvider() != null
+                    && provider.getId().equals(config.getCurrentCodexProvider().getId())) {
+                codexSettingsWriterService.writeToSettings(userId, provider);
+            }
+        });
     }
 
     /**
      * Test API connection for a provider.
      * Uses provided config or falls back to stored config.
      */
-    public ProviderDto.TestResult testProviderConnection(Long userId, String code, ProviderDto.TestRequest request) {
-        ModelProvider provider = providerRepository.findByCode(code)
+    public ProviderDto.TestResult testProviderConnection(Long userId, String code, TargetTool tool, ProviderDto.TestRequest request) {
+        ModelProvider provider = providerRepository.findByCodeAndTargetTool(code, tool)
                 .orElseThrow(() -> new BusinessException(ResponseCode.PROVIDER_NOT_FOUND));
 
         // Use request values or fall back to stored values
@@ -204,7 +205,7 @@ public class ProviderService {
                     .build();
         }
         String normalizedUrl = normalizeBaseUrl(baseUrl);
-        ProviderApiStyle apiStyle = resolveApiStyle(provider.getCode(), normalizedUrl);
+        ProviderApiStyle apiStyle = resolveApiStyle(provider.getCode(), normalizedUrl, tool);
         if (requiresModelNameForTest(apiStyle, normalizedUrl) && (modelName == null || modelName.isBlank())) {
             return ProviderDto.TestResult.builder()
                     .success(false)
@@ -228,16 +229,16 @@ public class ProviderService {
                     .build();
         }
 
-        return performTestRequest(provider.getCode(), normalizedUrl, modelName, apiKey);
+        return performTestRequest(provider.getCode(), normalizedUrl, modelName, apiKey, tool);
     }
 
-    private ProviderDto.TestResult performTestRequest(String providerCode, String normalizedUrl, String modelName, String apiKey) {
+    private ProviderDto.TestResult performTestRequest(String providerCode, String normalizedUrl, String modelName, String apiKey, TargetTool tool) {
         long startTime = System.currentTimeMillis();
         String testUrl = "";
 
         try {
             String normalizedApiKey = normalizeApiKey(apiKey);
-            ProviderApiStyle apiStyle = resolveApiStyle(providerCode, normalizedUrl);
+            ProviderApiStyle apiStyle = resolveApiStyle(providerCode, normalizedUrl, tool);
 
             testUrl = switch (apiStyle) {
                 case OPENROUTER, OPENAI -> buildChatCompletionsUrl(normalizedUrl);
@@ -294,11 +295,11 @@ public class ProviderService {
                             testUrl,
                             retryResponse.statusCode(),
                             truncate(retryResponse.body(), 4000));
-                    return buildTestResult(retryResponse, modelName, startTime);
+                    return buildTestResult(retryResponse, modelName, startTime, apiStyle);
                 }
             }
 
-            return buildTestResult(response, modelName, startTime);
+            return buildTestResult(response, modelName, startTime, apiStyle);
 
         } catch (java.net.ConnectException e) {
             log.warn("Test connection connect exception: provider={}, url={}, message={}", providerCode, testUrl, e.getMessage());
@@ -369,10 +370,18 @@ public class ProviderService {
         return "openrouter".equalsIgnoreCase(providerCode) || normalizedUrl.toLowerCase().contains("openrouter.ai");
     }
 
-    private ProviderApiStyle resolveApiStyle(String providerCode, String normalizedUrl) {
+    private ProviderApiStyle resolveApiStyle(String providerCode, String normalizedUrl, TargetTool tool) {
         String lowerUrl = normalizedUrl.toLowerCase();
         if (isOpenRouterProvider(providerCode, normalizedUrl)) {
             return ProviderApiStyle.OPENROUTER;
+        }
+        // Claude Code only ever sends Anthropic Messages API requests against the
+        // configured base_url, so testing must exercise the same shape — even when
+        // the URL path doesn't visibly look Anthropic (e.g. `/agent`, `/api/coding`).
+        // Otherwise a non-Anthropic upstream passes an OpenAI-style test, then
+        // crashes Claude Code at runtime on `usage.input_tokens`.
+        if (tool == TargetTool.CLAUDE_CODE) {
+            return ProviderApiStyle.ANTHROPIC;
         }
         if (isKimiCodingProvider(normalizedUrl)) {
             return ProviderApiStyle.ANTHROPIC;
@@ -489,10 +498,23 @@ public class ProviderService {
         return providerHint.isEmpty() ? null : providerHint;
     }
 
-    private ProviderDto.TestResult buildTestResult(HttpResponse<String> response, String modelName, long startTime) {
+    private ProviderDto.TestResult buildTestResult(HttpResponse<String> response, String modelName, long startTime, ProviderApiStyle apiStyle) {
         long responseTime = System.currentTimeMillis() - startTime;
 
         if (response.statusCode() >= 200 && response.statusCode() < 300) {
+            // For Claude Code (Anthropic Messages API) responses, verify the body
+            // includes `usage.input_tokens`. Without it Claude Code crashes at
+            // runtime with `undefined is not an object (evaluating '_.input_tokens')`.
+            if (apiStyle == ProviderApiStyle.ANTHROPIC) {
+                String usageError = validateAnthropicUsage(response.body());
+                if (usageError != null) {
+                    return ProviderDto.TestResult.builder()
+                            .success(false)
+                            .message(usageError)
+                            .responseTimeMs(responseTime)
+                            .build();
+                }
+            }
             return ProviderDto.TestResult.builder()
                     .success(true)
                     .message("连接成功")
@@ -519,6 +541,35 @@ public class ProviderService {
                     .message("请求失败: " + errorMsg)
                     .responseTimeMs(responseTime)
                     .build();
+        }
+    }
+
+    /**
+     * Returns null when the Anthropic Messages response includes the
+     * {@code usage.input_tokens} field Claude Code requires, otherwise returns
+     * a human-readable failure message describing the specific gap.
+     */
+    private String validateAnthropicUsage(String body) {
+        if (body == null || body.isBlank()) {
+            return "响应体为空，无法读取 usage.input_tokens（Claude Code 会崩）";
+        }
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            com.fasterxml.jackson.databind.JsonNode root = mapper.readTree(body);
+            com.fasterxml.jackson.databind.JsonNode usage = root.get("usage");
+            if (usage == null || usage.isNull() || !usage.isObject()) {
+                return "供应商响应缺少 usage 对象，不符合 Anthropic Messages API，Claude Code 会报 '_.input_tokens' 错误";
+            }
+            com.fasterxml.jackson.databind.JsonNode inputTokens = usage.get("input_tokens");
+            if (inputTokens == null || inputTokens.isNull() || !inputTokens.isNumber()) {
+                String hint = usage.has("prompt_tokens")
+                        ? "（看到 prompt_tokens —— 这是 OpenAI 风格，不是 Anthropic）"
+                        : "";
+                return "响应里 usage.input_tokens 缺失或非数字" + hint + "，Claude Code 会崩";
+            }
+            return null;
+        } catch (Exception e) {
+            return "响应不是合法 JSON，无法验证 usage.input_tokens：" + e.getMessage();
         }
     }
 
@@ -648,6 +699,8 @@ public class ProviderService {
                 .isActive(provider.getIsActive())
                 .sortOrder(provider.getSortOrder())
                 .iconUrl(provider.getIconUrl())
+                .targetTool(provider.getTargetTool() != null ? provider.getTargetTool().name() : null)
+                .wireApi(provider.getWireApi())
                 .createdAt(provider.getCreatedAt())
                 .build();
     }

@@ -18,16 +18,24 @@ const providerStore = useProviderStore()
 const toastStore = useToastStore()
 
 function isOfficialClaude(provider: ProviderInfo): boolean {
-  return provider.code === 'claude'
+  return provider.code === 'claude' && providerStore.activeTool === 'CLAUDE_CODE'
+}
+
+function isOfficialOpenAi(provider: ProviderInfo): boolean {
+  return provider.code === 'openai' && providerStore.activeTool === 'CODEX'
+}
+
+function isOfficialBuiltin(provider: ProviderInfo): boolean {
+  return isOfficialClaude(provider) || isOfficialOpenAi(provider)
 }
 
 function providerSubtitle(provider?: ProviderInfo | null): string {
   if (!provider) return '-'
-  return isOfficialClaude(provider) ? '官方登录' : provider.modelName
+  return isOfficialBuiltin(provider) ? '官方登录' : provider.modelName
 }
 
 function isProviderSwitchable(provider: ProviderInfo): boolean {
-  return !!provider.hasApiKey || isOfficialClaude(provider)
+  return !!provider.hasApiKey || isOfficialBuiltin(provider)
 }
 
 const stats = computed(() => {
@@ -56,8 +64,8 @@ const sortedProviders = computed(() => {
     if (a.hasApiKey && !b.hasApiKey) return -1
     if (!a.hasApiKey && b.hasApiKey) return 1
 
-    if (isOfficialClaude(a) && !isOfficialClaude(b)) return -1
-    if (!isOfficialClaude(a) && isOfficialClaude(b)) return 1
+    if (isOfficialBuiltin(a) && !isOfficialBuiltin(b)) return -1
+    if (!isOfficialBuiltin(a) && isOfficialBuiltin(b)) return 1
 
     // Default order is what's stored
     return 0
@@ -147,7 +155,7 @@ async function handleQuickSwitch(providerCode: string) {
         </button>
       </div>
       <div v-if="quickSwitchProviders.length === 0" class="text-center py-10 text-gray-500">
-        暂无可切换的模型，请先到模型管理添加 API Key 或使用 Claude 官方登录
+        暂无可切换的模型，请先到模型管理添加 API Key 或使用官方登录
       </div>
     </div>
 
@@ -179,7 +187,7 @@ async function handleQuickSwitch(providerCode: string) {
               已配置
             </span>
             <span
-              v-else-if="isOfficialClaude(provider)"
+              v-else-if="isOfficialBuiltin(provider)"
               class="px-3 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded-full"
             >
               官方登录

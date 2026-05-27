@@ -17,8 +17,14 @@ import type {
   SkillDetail,
   TrashSkillEntry,
   RenameSkillRequest,
-  SkillSummary
+  SkillSummary,
+  TargetTool
 } from '@/types'
+
+function toolQuery(tool: TargetTool): string {
+  const param = tool === 'CODEX' ? 'codex' : 'claude_code'
+  return `?tool=${param}`
+}
 
 // Auth API
 export const authApi = {
@@ -31,45 +37,48 @@ export const authApi = {
 
 // Provider API
 export const providerApi = {
-  getAll: () => apiGet<ProviderInfo[]>('/providers'),
+  getAll: (tool: TargetTool) => apiGet<ProviderInfo[]>(`/providers${toolQuery(tool)}`),
 
-  getMy: () => apiGet<ProviderInfo[]>('/providers/my'),
+  getMy: (tool: TargetTool) => apiGet<ProviderInfo[]>(`/providers/my${toolQuery(tool)}`),
 
-  getByCode: (code: string) => apiGet<ProviderInfo>(`/providers/${code}`),
+  getByCode: (code: string, tool: TargetTool) =>
+    apiGet<ProviderInfo>(`/providers/${code}${toolQuery(tool)}`),
 
-  createCustom: (data: CustomProviderCreateRequest) =>
-    apiPost<ProviderInfo>('/providers/custom', data),
+  createCustom: (data: CustomProviderCreateRequest, tool: TargetTool) =>
+    apiPost<ProviderInfo>(`/providers/custom${toolQuery(tool)}`, data),
 
-  update: (code: string, data: Partial<ProviderInfo>) =>
-    apiPut<ProviderInfo>(`/providers/${code}`, data),
+  update: (code: string, data: Partial<ProviderInfo>, tool: TargetTool) =>
+    apiPut<ProviderInfo>(`/providers/${code}${toolQuery(tool)}`, data),
 
-  updateConfig: (code: string, data: ProviderConfigUpdateRequest) =>
-    apiPut<ProviderInfo>(`/providers/${code}/config`, data),
+  updateConfig: (code: string, data: ProviderConfigUpdateRequest, tool: TargetTool) =>
+    apiPut<ProviderInfo>(`/providers/${code}/config${toolQuery(tool)}`, data),
 
-  testConnection: (code: string, data?: ProviderTestRequest) =>
-    apiPost<ProviderTestResult>(`/providers/${code}/test`, data || {})
+  testConnection: (code: string, tool: TargetTool, data?: ProviderTestRequest) =>
+    apiPost<ProviderTestResult>(`/providers/${code}/test${toolQuery(tool)}`, data || {})
 }
 
 // API Key API
 export const apiKeyApi = {
-  set: (providerCode: string, apiKey: string) =>
-    apiPost<ApiKeyInfo>('/api-keys', { providerCode, apiKey }),
+  set: (providerCode: string, apiKey: string, tool: TargetTool) =>
+    apiPost<ApiKeyInfo>(`/api-keys${toolQuery(tool)}`, { providerCode, apiKey }),
 
   getAll: () => apiGet<ApiKeyInfo[]>('/api-keys'),
 
-  getPlain: (providerCode: string) =>
-    apiGet<ApiKeyPlainInfo>(`/api-keys/${providerCode}/plain`),
+  getPlain: (providerCode: string, tool: TargetTool) =>
+    apiGet<ApiKeyPlainInfo>(`/api-keys/${providerCode}/plain${toolQuery(tool)}`),
 
-  delete: (providerCode: string) =>
-    apiDelete<void>(`/api-keys/${providerCode}`)
+  delete: (providerCode: string, tool: TargetTool) =>
+    apiDelete<void>(`/api-keys/${providerCode}${toolQuery(tool)}`)
 }
 
 // Config API
 export const configApi = {
-  get: () => apiGet<ConfigInfo>('/config'),
+  get: (tool: TargetTool) => apiGet<ConfigInfo>(`/config${toolQuery(tool)}`),
 
-  update: (data: { providerId: number; apiTimeout?: number; extraConfig?: Record<string, unknown> }) =>
-    apiPut<ConfigInfo>('/config', data),
+  update: (
+    data: { providerId: number; apiTimeout?: number; extraConfig?: Record<string, unknown> },
+    tool: TargetTool
+  ) => apiPut<ConfigInfo>(`/config${toolQuery(tool)}`, data),
 
   getBackups: (page = 0, size = 20) =>
     apiGet<{ backups: BackupInfo[]; total: number }>(`/config/backups?page=${page}&size=${size}`),
@@ -80,8 +89,8 @@ export const configApi = {
 
 // Switch API
 export const switchApi = {
-  switchTo: (providerCode: string, clientInfo?: string) =>
-    apiPost<SwitchResult>('/switch', { providerCode, clientInfo }),
+  switchTo: (providerCode: string, tool: TargetTool, clientInfo?: string) =>
+    apiPost<SwitchResult>(`/switch${toolQuery(tool)}`, { providerCode, clientInfo }),
 
   naturalLanguageSwitch: (prompt: string, sessionId?: string, clientInfo?: string) =>
     apiPost<NaturalLanguageResponse>('/ai/switch-by-nl', { prompt, sessionId, clientInfo }),

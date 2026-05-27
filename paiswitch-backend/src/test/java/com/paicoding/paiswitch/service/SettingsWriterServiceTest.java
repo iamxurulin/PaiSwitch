@@ -3,6 +3,7 @@ package com.paicoding.paiswitch.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.paicoding.paiswitch.domain.entity.ModelProvider;
+import com.paicoding.paiswitch.proxy.ProxyEndpointResolver;
 import com.paicoding.paiswitch.repository.ApiKeyRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -49,7 +50,10 @@ class SettingsWriterServiceTest {
                 """);
         System.setProperty(SETTINGS_PATH_PROPERTY, settingsPath.toString());
 
-        SettingsWriterService service = new SettingsWriterService(mock(ApiKeyRepository.class), mock(EncryptionService.class));
+        SettingsWriterService service = new SettingsWriterService(
+                mock(ApiKeyRepository.class),
+                mock(EncryptionService.class),
+                mock(ProxyEndpointResolver.class));
         ModelProvider provider = ModelProvider.builder()
                 .id(1L)
                 .code("claude")

@@ -3,6 +3,7 @@ package com.paicoding.paiswitch.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.paicoding.paiswitch.domain.entity.ModelProvider;
+import com.paicoding.paiswitch.domain.enums.TargetTool;
 import com.paicoding.paiswitch.repository.ModelProviderRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -46,7 +47,7 @@ public class LocalConfigService {
         LocalConfig localConfig = readLocalConfig();
         String providerCode = localConfig.providerCode();
 
-        providerRepository.findByCode(providerCode).ifPresent(provider -> {
+        providerRepository.findByCodeAndTargetTool(providerCode, TargetTool.CLAUDE_CODE).ifPresent(provider -> {
             boolean updated = false;
             String normalizedBaseUrl = localConfig.baseUrl();
 

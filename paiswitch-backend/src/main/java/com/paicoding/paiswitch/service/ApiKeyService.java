@@ -6,6 +6,7 @@ import com.paicoding.paiswitch.domain.dto.ApiKeyDto;
 import com.paicoding.paiswitch.domain.entity.ApiKey;
 import com.paicoding.paiswitch.domain.entity.ModelProvider;
 import com.paicoding.paiswitch.domain.entity.User;
+import com.paicoding.paiswitch.domain.enums.TargetTool;
 import com.paicoding.paiswitch.repository.ApiKeyRepository;
 import com.paicoding.paiswitch.repository.ModelProviderRepository;
 import com.paicoding.paiswitch.repository.UserConfigRepository;
@@ -30,13 +31,14 @@ public class ApiKeyService {
     private final UserConfigRepository configRepository;
     private final EncryptionService encryptionService;
     private final SettingsWriterService settingsWriterService;
+    private final CodexSettingsWriterService codexSettingsWriterService;
 
     @Transactional
-    public ApiKeyDto.KeyInfo setApiKey(Long userId, ApiKeyDto.SetKeyRequest request) {
+    public ApiKeyDto.KeyInfo setApiKey(Long userId, ApiKeyDto.SetKeyRequest request, TargetTool tool) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ResponseCode.USER_NOT_FOUND));
 
-        ModelProvider provider = providerRepository.findByCode(request.getProviderCode())
+        ModelProvider provider = providerRepository.findByCodeAndTargetTool(request.getProviderCode(), tool)
                 .orElseThrow(() -> new BusinessException(ResponseCode.PROVIDER_NOT_FOUND));
 
         String encryptedKey = encryptionService.encrypt(request.getApiKey());
@@ -54,7 +56,7 @@ public class ApiKeyService {
 
         apiKey = apiKeyRepository.save(apiKey);
         syncSettingsIfCurrentProvider(userId, provider);
-        log.info("Set API key for provider: {} and user: {}", provider.getCode(), userId);
+        log.info("Set API key for provider: {} ({}) and user: {}", provider.getCode(), tool, userId);
 
         return mapToKeyInfo(apiKey);
     }
@@ -67,8 +69,10 @@ public class ApiKeyService {
     }
 
     @Transactional(readOnly = true)
-    public String getDecryptedApiKey(Long userId, String providerCode) {
-        ApiKey apiKey = apiKeyRepository.findByUserIdAndProviderCode(userId, providerCode)
+    public String getDecryptedApiKey(Long userId, String providerCode, TargetTool tool) {
+        ModelProvider provider = providerRepository.findByCodeAndTargetTool(providerCode, tool)
+                .orElseThrow(() -> new BusinessException(ResponseCode.PROVIDER_NOT_FOUND));
+        ApiKey apiKey = apiKeyRepository.findByUserIdAndProviderId(userId, provider.getId())
                 .orElseThrow(() -> new BusinessException(ResponseCode.API_KEY_NOT_FOUND));
 
         if (!apiKey.getIsValid()) {
@@ -79,26 +83,28 @@ public class ApiKeyService {
     }
 
     @Transactional(readOnly = true)
-    public String getDecryptedApiKeyOptional(Long userId, String providerCode) {
-        return apiKeyRepository.findByUserIdAndProviderCode(userId, providerCode)
+    public String getDecryptedApiKeyOptional(Long userId, String providerCode, TargetTool tool) {
+        return providerRepository.findByCodeAndTargetTool(providerCode, tool)
+                .flatMap(provider -> apiKeyRepository.findByUserIdAndProviderId(userId, provider.getId()))
                 .filter(ApiKey::getIsValid)
                 .map(apiKey -> encryptionService.decrypt(apiKey.getEncryptedKey()))
                 .orElse(null);
     }
 
     @Transactional
-    public void deleteApiKey(Long userId, String providerCode) {
-        ModelProvider provider = providerRepository.findByCode(providerCode)
+    public void deleteApiKey(Long userId, String providerCode, TargetTool tool) {
+        ModelProvider provider = providerRepository.findByCodeAndTargetTool(providerCode, tool)
                 .orElseThrow(() -> new BusinessException(ResponseCode.PROVIDER_NOT_FOUND));
 
         apiKeyRepository.deleteByUserIdAndProviderId(userId, provider.getId());
         syncSettingsIfCurrentProvider(userId, provider);
-        log.info("Deleted API key for provider: {} and user: {}", providerCode, userId);
+        log.info("Deleted API key for provider: {} ({}) and user: {}", providerCode, tool, userId);
     }
 
     @Transactional
-    public void updateLastUsedAt(Long userId, String providerCode) {
-        apiKeyRepository.findByUserIdAndProviderCode(userId, providerCode)
+    public void updateLastUsedAt(Long userId, String providerCode, TargetTool tool) {
+        providerRepository.findByCodeAndTargetTool(providerCode, tool)
+                .flatMap(provider -> apiKeyRepository.findByUserIdAndProviderId(userId, provider.getId()))
                 .ifPresent(apiKey -> {
                     apiKey.setLastUsedAt(LocalDateTime.now());
                     apiKeyRepository.save(apiKey);
@@ -106,9 +112,17 @@ public class ApiKeyService {
     }
 
     private void syncSettingsIfCurrentProvider(Long userId, ModelProvider provider) {
-        configRepository.findByUserId(userId)
-                .filter(config -> provider.getCode().equals(config.getCurrentProvider().getCode()))
-                .ifPresent(config -> settingsWriterService.writeToSettings(userId, provider));
+        configRepository.findByUserId(userId).ifPresent(config -> {
+            if (provider.getTargetTool() == TargetTool.CLAUDE_CODE
+                    && config.getCurrentProvider() != null
+                    && provider.getId().equals(config.getCurrentProvider().getId())) {
+                settingsWriterService.writeToSettings(userId, provider);
+            } else if (provider.getTargetTool() == TargetTool.CODEX
+                    && config.getCurrentCodexProvider() != null
+                    && provider.getId().equals(config.getCurrentCodexProvider().getId())) {
+                codexSettingsWriterService.writeToSettings(userId, provider);
+            }
+        });
     }
 
     private ApiKeyDto.KeyInfo mapToKeyInfo(ApiKey apiKey) {

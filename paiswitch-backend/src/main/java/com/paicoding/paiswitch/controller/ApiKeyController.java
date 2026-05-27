@@ -3,6 +3,7 @@ package com.paicoding.paiswitch.controller;
 import com.paicoding.paiswitch.common.response.ApiResponse;
 import com.paicoding.paiswitch.common.security.JwtTokenProvider;
 import com.paicoding.paiswitch.domain.dto.ApiKeyDto;
+import com.paicoding.paiswitch.domain.enums.TargetTool;
 import com.paicoding.paiswitch.service.ApiKeyService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -27,9 +28,10 @@ public class ApiKeyController {
     @PostMapping
     public ApiResponse<ApiKeyDto.KeyInfo> setApiKey(
             @RequestHeader("Authorization") String authorization,
+            @RequestParam(required = false) String tool,
             @Valid @RequestBody ApiKeyDto.SetKeyRequest request) {
         Long userId = extractUserId(authorization);
-        return ApiResponse.success(apiKeyService.setApiKey(userId, request));
+        return ApiResponse.success(apiKeyService.setApiKey(userId, request, TargetTool.fromQueryParam(tool)));
     }
 
     @Operation(summary = "Get all API keys for current user")
@@ -44,9 +46,10 @@ public class ApiKeyController {
     @GetMapping("/{providerCode}/plain")
     public ApiResponse<ApiKeyDto.PlainKeyInfo> getPlainApiKey(
             @RequestHeader("Authorization") String authorization,
-            @PathVariable String providerCode) {
+            @PathVariable String providerCode,
+            @RequestParam(required = false) String tool) {
         Long userId = extractUserId(authorization);
-        String apiKey = apiKeyService.getDecryptedApiKeyOptional(userId, providerCode);
+        String apiKey = apiKeyService.getDecryptedApiKeyOptional(userId, providerCode, TargetTool.fromQueryParam(tool));
         return ApiResponse.success(ApiKeyDto.PlainKeyInfo.builder()
                 .providerCode(providerCode)
                 .apiKey(apiKey)
@@ -57,9 +60,10 @@ public class ApiKeyController {
     @DeleteMapping("/{providerCode}")
     public ApiResponse<Void> deleteApiKey(
             @RequestHeader("Authorization") String authorization,
-            @PathVariable String providerCode) {
+            @PathVariable String providerCode,
+            @RequestParam(required = false) String tool) {
         Long userId = extractUserId(authorization);
-        apiKeyService.deleteApiKey(userId, providerCode);
+        apiKeyService.deleteApiKey(userId, providerCode, TargetTool.fromQueryParam(tool));
         return ApiResponse.success("API key deleted", null);
     }
 

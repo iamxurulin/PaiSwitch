@@ -22,6 +22,7 @@ public class SpringAiConfig {
             SwitchDto.SwitchResult result = switchService.switchToProvider(
                     request.userId(),
                     request.providerCode(),
+                    com.paicoding.paiswitch.domain.enums.TargetTool.CLAUDE_CODE,
                     com.paicoding.paiswitch.domain.enums.SwitchType.AI_NATURAL_LANGUAGE,
                     null,
                     request.clientInfo()

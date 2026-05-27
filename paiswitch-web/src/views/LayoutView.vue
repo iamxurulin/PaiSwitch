@@ -4,6 +4,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useProviderStore } from '@/stores/provider'
 import { onMounted } from 'vue'
 import Toast from '@/components/Toast.vue'
+import type { TargetTool } from '@/types'
 
 const router = useRouter()
 const route = useRoute()
@@ -15,6 +16,11 @@ const navItems = [
   { path: '/providers', name: 'Providers', label: '模型管理', icon: '🔌' },
   { path: '/skills', name: 'Skills', label: 'Skills', icon: '🧠' },
   { path: '/ai-chat', name: 'AIChat', label: 'AI 助手', icon: '🤖' }
+]
+
+const toolTabs: { value: TargetTool; label: string }[] = [
+  { value: 'CLAUDE_CODE', label: 'Claude Code' },
+  { value: 'CODEX', label: 'Codex' }
 ]
 
 const isActive = (path: string) => {
@@ -31,6 +37,10 @@ onMounted(() => {
 function handleLogout() {
   authStore.logout()
   router.push('/login')
+}
+
+async function selectTool(tool: TargetTool) {
+  await providerStore.setActiveTool(tool)
 }
 </script>
 
@@ -68,14 +78,34 @@ function handleLogout() {
     <div class="flex-1 flex flex-col">
       <!-- Header -->
       <header class="h-20 bg-white border-b border-gray-100 flex items-center justify-between px-8">
-        <div class="flex items-center gap-3">
-          <span class="text-sm text-gray-500 font-light">当前模型:</span>
-          <span v-if="providerStore.currentConfig" class="px-4 py-1.5 bg-gray-100 rounded-full text-sm font-medium text-gray-900">
-            {{ providerStore.currentConfig.currentProvider.name }}
-          </span>
-          <span v-else class="px-4 py-1.5 bg-orange-50 text-orange-600 rounded-full text-sm font-medium">
-            未配置
-          </span>
+        <div class="flex items-center gap-6">
+          <!-- Tool Switcher -->
+          <div class="inline-flex bg-gray-100 rounded-xl p-1">
+            <button
+              v-for="tab in toolTabs"
+              :key="tab.value"
+              @click="selectTool(tab.value)"
+              class="px-4 py-1.5 text-sm font-medium rounded-lg transition-all duration-150"
+              :class="providerStore.activeTool === tab.value
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'"
+            >
+              {{ tab.label }}
+            </button>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <span class="text-sm text-gray-500 font-light">当前模型:</span>
+            <span
+              v-if="providerStore.currentConfig?.currentProvider"
+              class="px-4 py-1.5 bg-gray-100 rounded-full text-sm font-medium text-gray-900"
+            >
+              {{ providerStore.currentConfig.currentProvider.name }}
+            </span>
+            <span v-else class="px-4 py-1.5 bg-orange-50 text-orange-600 rounded-full text-sm font-medium">
+              未配置
+            </span>
+          </div>
         </div>
 
         <div class="flex items-center gap-6">

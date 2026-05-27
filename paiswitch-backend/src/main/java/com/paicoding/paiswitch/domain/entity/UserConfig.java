@@ -26,9 +26,15 @@ public class UserConfig {
     @JoinColumn(name = "user_id", nullable = false, unique = true)
     private User user;
 
+    /** Current provider for Claude Code (~/.claude/settings.json). */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "current_provider_id", nullable = false)
     private ModelProvider currentProvider;
+
+    /** Current provider for Codex (~/.codex/config.toml). Null until first switch. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "current_codex_provider_id")
+    private ModelProvider currentCodexProvider;
 
     @Column(name = "api_timeout", nullable = false)
     @Builder.Default

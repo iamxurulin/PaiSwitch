@@ -1,5 +1,5 @@
 server:
-  port: 0  # Auto-select available port
+  port: ${PAISWITCH_PORT:8080}
 
 spring:
   application:

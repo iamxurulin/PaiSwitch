@@ -4,6 +4,7 @@ import com.paicoding.paiswitch.domain.entity.ApiKey;
 import com.paicoding.paiswitch.domain.entity.ModelProvider;
 import com.paicoding.paiswitch.domain.entity.User;
 import com.paicoding.paiswitch.domain.entity.UserConfig;
+import com.paicoding.paiswitch.domain.enums.TargetTool;
 import com.paicoding.paiswitch.domain.enums.UserStatus;
 import com.paicoding.paiswitch.repository.ApiKeyRepository;
 import com.paicoding.paiswitch.repository.ModelProviderRepository;
@@ -67,11 +68,75 @@ public class DefaultUserInitializer implements CommandLineRunner {
                 "anthropic/claude-sonnet-4",
                 "anthropic/claude-3-haiku",
                 4);
+        createCodexBuiltinProviderIfMissing("openai", "OpenAI Official",
+                "OpenAI Codex official endpoint",
+                "https://api.openai.com/v1",
+                "gpt-5.5",
+                null,
+                "responses",
+                "openai",
+                1);
+        createCodexBuiltinProviderIfMissing("deepseek", "DeepSeek",
+                "DeepSeek API via OpenAI chat-completions",
+                "https://api.deepseek.com",
+                "deepseek-v4-pro",
+                "deepseek-v4-flash",
+                "chat",
+                "deepseek",
+                2);
+        createCodexBuiltinProviderIfMissing("zhipu", "Zhipu GLM",
+                "Zhipu GLM via OpenAI chat-completions",
+                "https://open.bigmodel.cn/api/paas/v4",
+                "glm-5",
+                null,
+                "chat",
+                "zhipu_glm",
+                3);
+        createCodexBuiltinProviderIfMissing("kimi", "Kimi (Moonshot)",
+                "Moonshot Kimi via OpenAI chat-completions",
+                "https://api.moonshot.cn/v1",
+                "kimi-k2.6",
+                null,
+                "chat",
+                "kimi",
+                4);
+        createCodexBuiltinProviderIfMissing("qwen", "Qwen (Bailian)",
+                "Aliyun Bailian Qwen-Coder via OpenAI chat-completions",
+                "https://dashscope.aliyuncs.com/compatible-mode/v1",
+                "qwen3-coder-plus",
+                "qwen3-max",
+                "chat",
+                "bailian",
+                5);
+        createCodexBuiltinProviderIfMissing("skyclaw", "SkyClaw v1.0",
+                "Skywork SkyClaw agent model via OpenAI-compatible chat-completions",
+                "https://api.apifree.ai/v1",
+                "skywork-ai/skyclaw-v1",
+                "skywork-ai/skyclaw-v1-lite",
+                "chat",
+                "skyclaw",
+                6);
+        // Claude Code side: SkyClaw only exposes OpenAI chat-completions. base_url
+        // points at the upstream; wire_api='openai' makes the settings writer route
+        // ANTHROPIC_BASE_URL through the local /claude-proxy/{code} translator so
+        // Claude Code's Anthropic Messages requests get converted both ways.
+        createBuiltinProviderWithWireApi("skyclaw", "SkyClaw v1.0",
+                "Skywork SkyClaw agent model (auto-translated via local Claude proxy)",
+                "https://api.apifree.ai/agent/v1",
+                "skywork-ai/skyclaw-v1",
+                "skywork-ai/skyclaw-v1-lite",
+                "openai",
+                5);
     }
 
     private void createBuiltinProviderIfMissing(String code, String name, String description, String baseUrl,
                                                 String modelName, String modelNameSmall, int sortOrder) {
-        if (modelProviderRepository.existsByCode(code)) {
+        createBuiltinProviderWithWireApi(code, name, description, baseUrl, modelName, modelNameSmall, null, sortOrder);
+    }
+
+    private void createBuiltinProviderWithWireApi(String code, String name, String description, String baseUrl,
+                                                  String modelName, String modelNameSmall, String wireApi, int sortOrder) {
+        if (modelProviderRepository.existsByCodeAndTargetTool(code, TargetTool.CLAUDE_CODE)) {
             return;
         }
 
@@ -85,8 +150,34 @@ public class DefaultUserInitializer implements CommandLineRunner {
                 .isBuiltin(true)
                 .isActive(true)
                 .sortOrder(sortOrder)
+                .targetTool(TargetTool.CLAUDE_CODE)
+                .wireApi(wireApi)
                 .build());
-        log.info("Created missing built-in provider: {}", code);
+        log.info("Created missing built-in provider: {} (wire_api={})", code, wireApi);
+    }
+
+    private void createCodexBuiltinProviderIfMissing(String code, String name, String description, String baseUrl,
+                                                     String modelName, String modelNameSmall, String wireApi,
+                                                     String providerKey, int sortOrder) {
+        if (modelProviderRepository.existsByCodeAndTargetTool(code, TargetTool.CODEX)) {
+            return;
+        }
+
+        modelProviderRepository.save(ModelProvider.builder()
+                .code(code)
+                .name(name)
+                .description(description)
+                .baseUrl(baseUrl)
+                .modelName(modelName)
+                .modelNameSmall(modelNameSmall)
+                .isBuiltin(true)
+                .isActive(true)
+                .sortOrder(sortOrder)
+                .targetTool(TargetTool.CODEX)
+                .wireApi(wireApi)
+                .providerKey(providerKey)
+                .build());
+        log.info("Created missing Codex built-in provider: {}", code);
     }
 
     private void syncLocalConfigToDatabase() {
@@ -118,8 +209,8 @@ public class DefaultUserInitializer implements CommandLineRunner {
             LocalConfigService.LocalConfig localConfig = localConfigService.readLocalConfig();
             String providerCode = localConfig.providerCode();
 
-            ModelProvider defaultProvider = modelProviderRepository.findByCode(providerCode)
-                    .orElseGet(() -> modelProviderRepository.findByCode("claude")
+            ModelProvider defaultProvider = modelProviderRepository.findByCodeAndTargetTool(providerCode, TargetTool.CLAUDE_CODE)
+                    .orElseGet(() -> modelProviderRepository.findByCodeAndTargetTool("claude", TargetTool.CLAUDE_CODE)
                             .orElseThrow(() -> new IllegalStateException("Default provider not found")));
 
             // Create user config with local settings

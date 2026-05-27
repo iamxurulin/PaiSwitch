@@ -3,14 +3,13 @@ package com.paicoding.paiswitch.controller;
 import com.paicoding.paiswitch.common.response.ApiResponse;
 import com.paicoding.paiswitch.common.security.JwtTokenProvider;
 import com.paicoding.paiswitch.domain.dto.ProviderDto;
+import com.paicoding.paiswitch.domain.enums.TargetTool;
 import com.paicoding.paiswitch.service.ProviderService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -26,23 +25,27 @@ public class ProviderController {
 
     @Operation(summary = "Get all active providers (public)")
     @GetMapping
-    public ApiResponse<List<ProviderDto.ProviderInfo>> getAllProviders() {
-        return ApiResponse.success(providerService.getAllProviders());
+    public ApiResponse<List<ProviderDto.ProviderInfo>> getAllProviders(
+            @RequestParam(required = false) String tool) {
+        return ApiResponse.success(providerService.getAllProviders(TargetTool.fromQueryParam(tool)));
     }
 
     @Operation(summary = "Get providers for current user (with API key status)")
     @GetMapping("/my")
     @SecurityRequirement(name = "bearerAuth")
     public ApiResponse<List<ProviderDto.ProviderInfo>> getMyProviders(
-            @RequestHeader("Authorization") String authorization) {
+            @RequestHeader("Authorization") String authorization,
+            @RequestParam(required = false) String tool) {
         Long userId = extractUserId(authorization);
-        return ApiResponse.success(providerService.getProvidersForUser(userId));
+        return ApiResponse.success(providerService.getProvidersForUser(userId, TargetTool.fromQueryParam(tool)));
     }
 
     @Operation(summary = "Get provider by code")
     @GetMapping("/{code}")
-    public ApiResponse<ProviderDto.ProviderInfo> getProvider(@PathVariable String code) {
-        return ApiResponse.success(providerService.getProviderByCode(code));
+    public ApiResponse<ProviderDto.ProviderInfo> getProvider(
+            @PathVariable String code,
+            @RequestParam(required = false) String tool) {
+        return ApiResponse.success(providerService.getProviderByCode(code, TargetTool.fromQueryParam(tool)));
     }
 
     @Operation(summary = "Create custom provider")
@@ -50,9 +53,10 @@ public class ProviderController {
     @SecurityRequirement(name = "bearerAuth")
     public ApiResponse<ProviderDto.ProviderInfo> createCustomProvider(
             @RequestHeader("Authorization") String authorization,
+            @RequestParam(required = false) String tool,
             @Valid @RequestBody ProviderDto.CreateRequest request) {
         Long userId = extractUserId(authorization);
-        return ApiResponse.success(providerService.createCustomProvider(userId, request));
+        return ApiResponse.success(providerService.createCustomProvider(userId, request, TargetTool.fromQueryParam(tool)));
     }
 
     @Operation(summary = "Update custom provider")
@@ -61,9 +65,10 @@ public class ProviderController {
     public ApiResponse<ProviderDto.ProviderInfo> updateProvider(
             @RequestHeader("Authorization") String authorization,
             @PathVariable String code,
+            @RequestParam(required = false) String tool,
             @RequestBody ProviderDto.UpdateRequest request) {
         Long userId = extractUserId(authorization);
-        return ApiResponse.success(providerService.updateProvider(userId, code, request));
+        return ApiResponse.success(providerService.updateProvider(userId, code, TargetTool.fromQueryParam(tool), request));
     }
 
     @Operation(summary = "Update provider configuration (baseUrl, modelName, modelNameSmall)")
@@ -72,9 +77,10 @@ public class ProviderController {
     public ApiResponse<ProviderDto.ProviderInfo> updateProviderConfig(
             @RequestHeader("Authorization") String authorization,
             @PathVariable String code,
+            @RequestParam(required = false) String tool,
             @RequestBody ProviderDto.ConfigUpdateRequest request) {
         Long userId = extractUserId(authorization);
-        return ApiResponse.success(providerService.updateProviderConfig(userId, code, request));
+        return ApiResponse.success(providerService.updateProviderConfig(userId, code, TargetTool.fromQueryParam(tool), request));
     }
 
     @Operation(summary = "Test provider API connection")
@@ -83,12 +89,13 @@ public class ProviderController {
     public ApiResponse<ProviderDto.TestResult> testProviderConnection(
             @RequestHeader("Authorization") String authorization,
             @PathVariable String code,
+            @RequestParam(required = false) String tool,
             @RequestBody(required = false) ProviderDto.TestRequest request) {
         Long userId = extractUserId(authorization);
         if (request == null) {
             request = new ProviderDto.TestRequest();
         }
-        return ApiResponse.success(providerService.testProviderConnection(userId, code, request));
+        return ApiResponse.success(providerService.testProviderConnection(userId, code, TargetTool.fromQueryParam(tool), request));
     }
 
     private Long extractUserId(String authorization) {

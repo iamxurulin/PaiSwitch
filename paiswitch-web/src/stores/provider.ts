@@ -11,19 +11,36 @@ import type {
   ProviderTestRequest,
   ProviderTestResult,
   ConversationHistoryResponse,
-  CustomProviderCreateRequest
+  CustomProviderCreateRequest,
+  TargetTool
 } from '@/types'
 
+const ACTIVE_TOOL_STORAGE_KEY = 'paiswitch.activeTool'
+
+function loadInitialTool(): TargetTool {
+  const stored = localStorage.getItem(ACTIVE_TOOL_STORAGE_KEY)
+  return stored === 'CODEX' ? 'CODEX' : 'CLAUDE_CODE'
+}
+
 export const useProviderStore = defineStore('provider', () => {
+  const activeTool = ref<TargetTool>(loadInitialTool())
   const providers = ref<ProviderInfo[]>([])
   const apiKeys = ref<ApiKeyInfo[]>([])
   const currentConfig = ref<ConfigInfo | null>(null)
   const loading = ref(false)
 
+  function setActiveTool(tool: TargetTool) {
+    if (activeTool.value === tool) return
+    activeTool.value = tool
+    localStorage.setItem(ACTIVE_TOOL_STORAGE_KEY, tool)
+    // Reload tool-scoped data; api-keys list is global so we keep it.
+    return Promise.all([fetchProviders(), fetchConfig()])
+  }
+
   async function fetchProviders() {
     loading.value = true
     try {
-      providers.value = await providerApi.getMy()
+      providers.value = await providerApi.getMy(activeTool.value)
     } finally {
       loading.value = false
     }
@@ -34,27 +51,32 @@ export const useProviderStore = defineStore('provider', () => {
   }
 
   async function fetchConfig() {
-    currentConfig.value = await configApi.get()
+    try {
+      currentConfig.value = await configApi.get(activeTool.value)
+    } catch (e) {
+      // Codex may have no current provider yet — treat as null instead of throwing.
+      currentConfig.value = null
+    }
   }
 
   async function setApiKey(providerCode: string, apiKey: string) {
-    await apiKeyApi.set(providerCode, apiKey)
+    await apiKeyApi.set(providerCode, apiKey, activeTool.value)
     await fetchApiKeys()
     await fetchProviders()
   }
 
   async function deleteApiKey(providerCode: string) {
-    await apiKeyApi.delete(providerCode)
+    await apiKeyApi.delete(providerCode, activeTool.value)
     await fetchApiKeys()
     await fetchProviders()
   }
 
   async function getApiKeyPlain(providerCode: string): Promise<ApiKeyPlainInfo> {
-    return apiKeyApi.getPlain(providerCode)
+    return apiKeyApi.getPlain(providerCode, activeTool.value)
   }
 
   async function switchProvider(providerCode: string): Promise<SwitchResult> {
-    const result = await switchApi.switchTo(providerCode)
+    const result = await switchApi.switchTo(providerCode, activeTool.value)
     if (result.success) {
       await fetchConfig()
     }
@@ -74,22 +96,22 @@ export const useProviderStore = defineStore('provider', () => {
   }
 
   async function updateProviderConfig(providerCode: string, config: ProviderConfigUpdateRequest) {
-    const result = await providerApi.updateConfig(providerCode, config)
+    const result = await providerApi.updateConfig(providerCode, config, activeTool.value)
     await fetchProviders()
     return result
   }
 
   async function createCustomProvider(data: CustomProviderCreateRequest, apiKey?: string) {
-    const provider = await providerApi.createCustom(data)
+    const provider = await providerApi.createCustom(data, activeTool.value)
     if (apiKey && apiKey.trim()) {
-      await apiKeyApi.set(provider.code, apiKey.trim())
+      await apiKeyApi.set(provider.code, apiKey.trim(), activeTool.value)
     }
     await Promise.all([fetchProviders(), fetchApiKeys()])
     return provider
   }
 
   async function testProviderConnection(providerCode: string, testConfig?: ProviderTestRequest): Promise<ProviderTestResult> {
-    return providerApi.testConnection(providerCode, testConfig)
+    return providerApi.testConnection(providerCode, activeTool.value, testConfig)
   }
 
   async function init() {
@@ -97,10 +119,12 @@ export const useProviderStore = defineStore('provider', () => {
   }
 
   return {
+    activeTool,
     providers,
     apiKeys,
     currentConfig,
     loading,
+    setActiveTool,
     fetchProviders,
     fetchApiKeys,
     fetchConfig,

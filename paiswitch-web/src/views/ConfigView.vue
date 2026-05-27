@@ -38,7 +38,7 @@ async function handleSwitch(providerCode: string) {
     <div class="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm mb-6">
       <h3 class="text-xl font-semibold text-gray-900 mb-6">当前配置</h3>
 
-      <div v-if="providerStore.currentConfig" class="space-y-4">
+      <div v-if="providerStore.currentConfig?.currentProvider" class="space-y-4">
         <div class="flex justify-between items-center py-3 border-b border-gray-100">
           <span class="text-gray-500">当前模型</span>
           <span class="font-medium text-gray-900">
@@ -77,7 +77,7 @@ async function handleSwitch(providerCode: string) {
           @click="handleSwitch(provider.code)"
           class="p-5 border border-gray-200 rounded-xl text-left hover:border-gray-900 hover:bg-gray-50 transition-all duration-200 hover:shadow-md"
           :class="{
-            'border-gray-900 bg-gray-50 shadow-md': providerStore.currentConfig?.currentProvider.code === provider.code
+            'border-gray-900 bg-gray-50 shadow-md': providerStore.currentConfig?.currentProvider?.code === provider.code
           }"
         >
           <div class="font-medium text-gray-900 text-lg">{{ provider.name }}</div>
