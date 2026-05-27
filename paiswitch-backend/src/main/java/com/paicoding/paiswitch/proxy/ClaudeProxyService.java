@@ -91,9 +91,11 @@ public class ClaudeProxyService {
                         reqBuilder.build(),
                         HttpResponse.BodyHandlers.ofString());
 
+                int bodyLen = upstream.body() == null ? 0 : upstream.body().length();
+                log.info("Upstream response: status={}, bytes={}, snippet={}",
+                        upstream.statusCode(), bodyLen, truncate(upstream.body(), 500));
+
                 if (upstream.statusCode() / 100 != 2) {
-                    log.warn("Upstream non-2xx: {} body={}", upstream.statusCode(),
-                            truncate(upstream.body(), 500));
                     eventEmitter.emitError(emitter,
                             "Upstream returned " + upstream.statusCode() + ": "
                                     + truncate(upstream.body(), 300),
@@ -102,6 +104,13 @@ public class ClaudeProxyService {
                 }
 
                 JsonNode chatResponse = objectMapper.readTree(upstream.body());
+                String bodyError = ChatResponseValidator.describeBodyLevelError(chatResponse);
+                if (bodyError != null) {
+                    log.warn("Upstream HTTP 2xx but body-level error: {}", bodyError);
+                    eventEmitter.emitError(emitter, bodyError, "upstream_error");
+                    return;
+                }
+
                 eventEmitter.emitFromChatCompletion(emitter, chatResponse, requestedModel);
                 emitter.complete();
             } catch (Throwable t) {

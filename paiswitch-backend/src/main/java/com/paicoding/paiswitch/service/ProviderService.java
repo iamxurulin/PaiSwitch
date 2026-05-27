@@ -6,6 +6,7 @@ import com.paicoding.paiswitch.domain.dto.ProviderDto;
 import com.paicoding.paiswitch.domain.entity.ApiKey;
 import com.paicoding.paiswitch.domain.entity.ModelProvider;
 import com.paicoding.paiswitch.domain.enums.TargetTool;
+import com.paicoding.paiswitch.proxy.ChatResponseValidator;
 import com.paicoding.paiswitch.repository.ApiKeyRepository;
 import com.paicoding.paiswitch.repository.ModelProviderRepository;
 import com.paicoding.paiswitch.repository.UserConfigRepository;
@@ -514,6 +515,19 @@ public class ProviderService {
                             .responseTimeMs(responseTime)
                             .build();
                 }
+            } else {
+                // OpenAI-compatible upstreams: some providers (apifree.ai / SkyClaw)
+                // wrap errors in HTTP 200 with a body-level `error` object. Without
+                // this check the test mis-reports "success" while real Codex/Claude
+                // traffic silently returns nothing.
+                String bodyError = validateOpenAiChatBody(response.body());
+                if (bodyError != null) {
+                    return ProviderDto.TestResult.builder()
+                            .success(false)
+                            .message(bodyError)
+                            .responseTimeMs(responseTime)
+                            .build();
+                }
             }
             return ProviderDto.TestResult.builder()
                     .success(true)
@@ -570,6 +584,25 @@ public class ProviderService {
             return null;
         } catch (Exception e) {
             return "响应不是合法 JSON，无法验证 usage.input_tokens：" + e.getMessage();
+        }
+    }
+
+    /**
+     * Catches the "HTTP 200 + body-level error" pattern emitted by some
+     * OpenAI-compatible upstreams (apifree.ai / SkyClaw wrap errors as
+     * {@code {"code":401,"error":{...}}}). Returns null when the body looks
+     * like a usable chat-completion response.
+     */
+    private String validateOpenAiChatBody(String body) {
+        if (body == null || body.isBlank()) {
+            return "响应体为空，无法判断是否是有效的 chat-completion";
+        }
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            com.fasterxml.jackson.databind.JsonNode root = mapper.readTree(body);
+            return ChatResponseValidator.describeBodyLevelError(root);
+        } catch (Exception e) {
+            return "响应不是合法 JSON：" + e.getMessage();
         }
     }
 

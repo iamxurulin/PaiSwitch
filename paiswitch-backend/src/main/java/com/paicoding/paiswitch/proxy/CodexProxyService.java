@@ -87,8 +87,11 @@ public class CodexProxyService {
                         reqBuilder.build(),
                         HttpResponse.BodyHandlers.ofString());
 
+                int bodyLen = upstream.body() == null ? 0 : upstream.body().length();
+                log.info("Upstream response: status={}, bytes={}, snippet={}",
+                        upstream.statusCode(), bodyLen, truncate(upstream.body(), 500));
+
                 if (upstream.statusCode() / 100 != 2) {
-                    log.warn("Upstream non-2xx: {} body={}", upstream.statusCode(), truncate(upstream.body(), 500));
                     fail(emitter,
                             "Upstream returned " + upstream.statusCode() + ": " + truncate(upstream.body(), 200),
                             "upstream_error");
@@ -96,6 +99,13 @@ public class CodexProxyService {
                 }
 
                 JsonNode chatResponse = objectMapper.readTree(upstream.body());
+                String bodyError = ChatResponseValidator.describeBodyLevelError(chatResponse);
+                if (bodyError != null) {
+                    log.warn("Upstream HTTP 2xx but body-level error: {}", bodyError);
+                    fail(emitter, bodyError, "upstream_error");
+                    return;
+                }
+
                 responseEventEmitter.emitFromChatCompletion(emitter, chatResponse, chatRequest.path("model").asText(""));
                 emitter.complete();
             } catch (Throwable t) {
