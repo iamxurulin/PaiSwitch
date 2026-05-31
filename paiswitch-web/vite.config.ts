@@ -3,8 +3,8 @@ import vue from '@vitejs/plugin-vue'
 import { resolve } from 'path'
 import http from 'node:http'
 
-const DEFAULT_PROXY_TARGET = 'http://localhost:8080'
-const DISCOVERY_PORTS = Array.from({ length: 10 }, (_, index) => 8080 + index)
+const DEFAULT_PROXY_TARGET = 'http://localhost:8086'
+const DISCOVERY_PORTS = [8086]
 const REQUIRED_API_PATHS = ['/api/v1/auth/login', '/api/v1/providers', '/api/v1/config']
 
 function hasPaiSwitchApis(body: string): boolean {

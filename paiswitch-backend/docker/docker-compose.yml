@@ -32,7 +32,7 @@ services:
       AES_ENCRYPTION_KEY: ${AES_ENCRYPTION_KEY:-paiswitch-aes-32-characters-key}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     ports:
-      - "8080:8080"
+      - "8086:8086"
     depends_on:
       mysql:
         condition: service_healthy

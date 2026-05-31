@@ -29,7 +29,7 @@ struct LoginView: View {
                 Text("服务器地址")
                     .font(.caption)
                     .foregroundColor(.secondary)
-                TextField("http://localhost:8080/api/v1", text: $serverURL)
+                TextField("http://localhost:8086/api/v1", text: $serverURL)
                     .textFieldStyle(.roundedBorder)
                     .onAppear {
                         serverURL = authManager.getServerURL()

@@ -73,7 +73,7 @@ The `api/client.ts` wrapper functions automatically unwrap to return just the `d
 ### Backend Integration
 
 **Development Proxy**
-Vite dev server proxies `/api` requests to `http://localhost:8080` (configured in vite.config.ts).
+Vite dev server proxies `/api` requests to `http://localhost:8086` (configured in vite.config.ts).
 
 **Path Alias**
 `@/` is aliased to `src/` directory for cleaner imports.

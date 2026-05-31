@@ -80,6 +80,6 @@ class AuthManager: ObservableObject {
     }
 
     func getServerURL() -> String {
-        UserDefaults.standard.string(forKey: "api_base_url") ?? "http://localhost:8080/api/v1"
+        UserDefaults.standard.string(forKey: "api_base_url") ?? "http://localhost:8086/api/v1"
     }
 }

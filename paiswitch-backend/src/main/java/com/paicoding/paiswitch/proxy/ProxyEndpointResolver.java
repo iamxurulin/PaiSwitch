@@ -44,8 +44,8 @@ public class ProxyEndpointResolver {
         int port = boundPort.get();
         if (port <= 0) {
             // Should only happen if writer is called before the web server boots.
-            log.warn("Codex proxy port not yet known; defaulting to :8080");
-            return DEFAULT_HOST + ":8080";
+            log.warn("Codex proxy port not yet known; defaulting to :8086");
+            return DEFAULT_HOST + ":8086";
         }
         return DEFAULT_HOST + ":" + port;
     }

@@ -70,6 +70,6 @@ src/
 
 ## 代理配置
 
-开发模式下，`/api` 请求会代理到 `http://localhost:8080`。
+开发模式下，`/api` 请求会代理到 `http://localhost:8086`。
 
 如需修改后端地址，编辑 `vite.config.ts`。

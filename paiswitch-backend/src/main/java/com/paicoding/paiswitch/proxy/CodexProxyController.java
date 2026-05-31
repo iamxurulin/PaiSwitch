@@ -19,7 +19,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  * chat-completions APIs (DeepSeek / Kimi / Zhipu / Qwen-Bailian).
  * <p>
  * Codex CLI's {@code base_url} in {@code ~/.codex/config.toml} is rewritten to
- * {@code http://127.0.0.1:8080/codex-proxy/{providerCode}/v1} so its requests
+ * {@code http://127.0.0.1:8086/codex-proxy/{providerCode}/v1} so its requests
  * land here. The proxy:
  * <ol>
  *   <li>Receives {@code POST .../v1/responses} with a Responses API JSON body</li>

@@ -19,7 +19,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  * OpenAI chat-completions API (e.g. apifree.ai SkyClaw).
  * <p>
  * Claude Code's {@code ANTHROPIC_BASE_URL} in {@code ~/.claude/settings.json} is
- * rewritten to {@code http://127.0.0.1:8080/claude-proxy/{providerCode}} so its
+ * rewritten to {@code http://127.0.0.1:8086/claude-proxy/{providerCode}} so its
  * {@code POST /v1/messages} requests land here. The proxy:
  * <ol>
  *   <li>Receives an Anthropic Messages-API JSON body (+ {@code x-api-key} header)</li>

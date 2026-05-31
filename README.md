@@ -36,7 +36,7 @@ PaiSwitch/
 **在线模式：**
 1. 启动后端服务
 2. 在 macOS 应用中点击「登录以启用在线功能」
-3. 输入服务器地址（如 `http://localhost:8080/api/v1`）
+3. 输入服务器地址（如 `http://localhost:8086/api/v1`）
 4. 登录后可使用 AI 助手进行自然语言切换
 
 ---
@@ -192,7 +192,7 @@ npm run dev
 | POST | /api/v1/switch | 切换模型 |
 | POST | /api/v1/ai/switch-by-nl | 自然语言切换 |
 
-完整 API 文档：http://localhost:8080/swagger-ui.html
+完整 API 文档：http://localhost:8086/swagger-ui.html
 
 ---
 

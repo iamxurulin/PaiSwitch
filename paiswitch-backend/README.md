@@ -34,7 +34,7 @@ mvn spring-boot:run
 2. 创建所有数据表
 3. 插入内置模型提供商数据
 
-启动成功后访问：http://localhost:8080/swagger-ui.html
+启动成功后访问：http://localhost:8086/swagger-ui.html
 
 **默认账号：**
 - 用户名：`admin`
@@ -94,8 +94,8 @@ docker-compose down -v
 ## API 文档
 
 启动后访问：
-- **Swagger UI**: http://localhost:8080/swagger-ui.html
-- **OpenAPI JSON**: http://localhost:8080/api-docs
+- **Swagger UI**: http://localhost:8086/swagger-ui.html
+- **OpenAPI JSON**: http://localhost:8086/api-docs
 
 ---
 
@@ -148,7 +148,7 @@ docker-compose down -v
 ### 1. 注册用户
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/auth/register \
+curl -X POST http://localhost:8086/api/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{
     "username": "testuser",
@@ -162,7 +162,7 @@ curl -X POST http://localhost:8080/api/v1/auth/register \
 ### 2. 设置 API Key
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/api-keys \
+curl -X POST http://localhost:8086/api/v1/api-keys \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <your_token>" \
   -d '{
@@ -174,7 +174,7 @@ curl -X POST http://localhost:8080/api/v1/api-keys \
 ### 3. 切换模型
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/switch \
+curl -X POST http://localhost:8086/api/v1/switch \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <your_token>" \
   -d '{
@@ -185,7 +185,7 @@ curl -X POST http://localhost:8080/api/v1/switch \
 ### 4. 自然语言切换
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/ai/switch-by-nl \
+curl -X POST http://localhost:8086/api/v1/ai/switch-by-nl \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <your_token>" \
   -d '{

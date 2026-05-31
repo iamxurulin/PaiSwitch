@@ -30,7 +30,7 @@ import java.util.Optional;
  *       only accepts {@code wire_api = "responses"}. Since these providers speak
  *       chat-completions, we point {@code base_url} at PaiSwitch's local proxy
  *       (controlled by {@code paiswitch.codex.proxy.base-url}, default
- *       {@code http://127.0.0.1:8080}); the proxy does Responses ↔ chat translation.</li>
+ *       {@code http://127.0.0.1:8086}); the proxy does Responses ↔ chat translation.</li>
  *   <li><b>Custom user-created</b> — same proxy path as third-party.</li>
  * </ul>
  * Example for DeepSeek:
@@ -42,7 +42,7 @@ import java.util.Optional;
  *
  * [model_providers.deepseek]
  * name = "DeepSeek"
- * base_url = "http://127.0.0.1:8080/codex-proxy/deepseek/v1"
+ * base_url = "http://127.0.0.1:8086/codex-proxy/deepseek/v1"
  * wire_api = "responses"
  * requires_openai_auth = true
  * </pre>

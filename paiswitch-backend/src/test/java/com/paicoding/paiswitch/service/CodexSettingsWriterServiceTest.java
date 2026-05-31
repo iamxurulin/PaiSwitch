@@ -120,7 +120,7 @@ class CodexSettingsWriterServiceTest {
 
                 [model_providers.deepseek]
                 name = "DeepSeek"
-                base_url = "http://127.0.0.1:8080/codex-proxy/deepseek/v1"
+                base_url = "http://127.0.0.1:8086/codex-proxy/deepseek/v1"
                 wire_api = "responses"
                 requires_openai_auth = true
 

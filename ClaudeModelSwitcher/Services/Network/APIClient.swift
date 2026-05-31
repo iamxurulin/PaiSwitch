@@ -36,7 +36,7 @@ class APIClient {
     static let shared = APIClient()
 
     var baseURL: String {
-        UserDefaults.standard.string(forKey: "api_base_url") ?? "http://localhost:8080/api/v1"
+        UserDefaults.standard.string(forKey: "api_base_url") ?? "http://localhost:8086/api/v1"
     }
 
     var token: String? {
