@@ -7,6 +7,7 @@ import com.paicoding.paiswitch.domain.entity.ApiKey;
 import com.paicoding.paiswitch.domain.entity.ModelProvider;
 import com.paicoding.paiswitch.domain.enums.TargetTool;
 import com.paicoding.paiswitch.proxy.ChatResponseValidator;
+import com.paicoding.paiswitch.proxy.UpstreamRequestConfig;
 import com.paicoding.paiswitch.repository.ApiKeyRepository;
 import com.paicoding.paiswitch.repository.ModelProviderRepository;
 import com.paicoding.paiswitch.repository.UserConfigRepository;
@@ -33,6 +34,7 @@ public class ProviderService {
     private static final String CLAUDE_OFFICIAL_BASE_URL = "https://api.anthropic.com";
     private static final String CLAUDE_DEFAULT_MODEL = "claude-sonnet-4-20250514";
     private static final String CLAUDE_DEFAULT_SMALL_MODEL = "claude-3-5-haiku-latest";
+    private static final String OPENAI_WIRE_API = "openai";
 
     private enum ProviderApiStyle {
         OPENROUTER,
@@ -206,8 +208,9 @@ public class ProviderService {
                     .build();
         }
         String normalizedUrl = normalizeBaseUrl(baseUrl);
-        ProviderApiStyle apiStyle = resolveApiStyle(provider.getCode(), normalizedUrl, tool);
-        if (requiresModelNameForTest(apiStyle, normalizedUrl) && (modelName == null || modelName.isBlank())) {
+        UpstreamRequestConfig upstreamConfig = UpstreamRequestConfig.fromBaseUrl(normalizedUrl);
+        ProviderApiStyle apiStyle = resolveApiStyle(provider, upstreamConfig.baseUrl(), tool);
+        if (requiresModelNameForTest(apiStyle, upstreamConfig.baseUrl()) && (modelName == null || modelName.isBlank())) {
             return ProviderDto.TestResult.builder()
                     .success(false)
                     .message("模型名称未配置")
@@ -230,20 +233,23 @@ public class ProviderService {
                     .build();
         }
 
-        return performTestRequest(provider.getCode(), normalizedUrl, modelName, apiKey, tool);
+        return performTestRequest(provider, normalizedUrl, modelName, apiKey, tool);
     }
 
-    private ProviderDto.TestResult performTestRequest(String providerCode, String normalizedUrl, String modelName, String apiKey, TargetTool tool) {
+    private ProviderDto.TestResult performTestRequest(ModelProvider provider, String normalizedUrl, String modelName, String apiKey, TargetTool tool) {
         long startTime = System.currentTimeMillis();
         String testUrl = "";
+        String providerCode = provider.getCode();
 
         try {
             String normalizedApiKey = normalizeApiKey(apiKey);
-            ProviderApiStyle apiStyle = resolveApiStyle(providerCode, normalizedUrl, tool);
+            UpstreamRequestConfig upstreamConfig = UpstreamRequestConfig.fromBaseUrl(normalizedUrl);
+            String upstreamBaseUrl = upstreamConfig.baseUrl();
+            ProviderApiStyle apiStyle = resolveApiStyle(provider, upstreamBaseUrl, tool);
 
             testUrl = switch (apiStyle) {
-                case OPENROUTER, OPENAI -> buildChatCompletionsUrl(normalizedUrl);
-                case ANTHROPIC -> buildMessagesTestUrl(normalizedUrl);
+                case OPENROUTER, OPENAI -> buildChatCompletionsUrl(upstreamBaseUrl);
+                case ANTHROPIC -> buildMessagesTestUrl(upstreamBaseUrl);
             };
             String requestBody = switch (apiStyle) {
                 case OPENROUTER -> buildOpenRouterTestRequestBody(modelName);
@@ -256,6 +262,7 @@ public class ProviderService {
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                     .timeout(Duration.ofSeconds(30));
+            upstreamConfig.headers().forEach(requestBuilder::header);
 
             switch (apiStyle) {
                 case OPENROUTER, OPENAI ->
@@ -284,7 +291,7 @@ public class ProviderService {
                 List<String> availableProviders = extractOpenRouterAvailableProviders(response.body());
                 if (!availableProviders.isEmpty()) {
                     String retryRequestBody = buildOpenRouterTestRequestBody(modelName, availableProviders);
-                    HttpRequest retryRequest = buildHttpRequest(testUrl, retryRequestBody, apiStyle, normalizedApiKey);
+                    HttpRequest retryRequest = buildHttpRequest(testUrl, retryRequestBody, apiStyle, normalizedApiKey, upstreamConfig);
                     log.info("Test retry request -> provider={}, url={}, order={}, body={}",
                             providerCode,
                             testUrl,
@@ -371,10 +378,14 @@ public class ProviderService {
         return "openrouter".equalsIgnoreCase(providerCode) || normalizedUrl.toLowerCase().contains("openrouter.ai");
     }
 
-    private ProviderApiStyle resolveApiStyle(String providerCode, String normalizedUrl, TargetTool tool) {
+    private ProviderApiStyle resolveApiStyle(ModelProvider provider, String normalizedUrl, TargetTool tool) {
+        String providerCode = provider.getCode();
         String lowerUrl = normalizedUrl.toLowerCase();
         if (isOpenRouterProvider(providerCode, normalizedUrl)) {
             return ProviderApiStyle.OPENROUTER;
+        }
+        if (tool == TargetTool.CLAUDE_CODE && isOpenAiWireProvider(provider)) {
+            return ProviderApiStyle.OPENAI;
         }
         // Claude Code only ever sends Anthropic Messages API requests against the
         // configured base_url, so testing must exercise the same shape — even when
@@ -391,6 +402,11 @@ public class ProviderService {
             return ProviderApiStyle.ANTHROPIC;
         }
         return ProviderApiStyle.OPENAI;
+    }
+
+    private boolean isOpenAiWireProvider(ModelProvider provider) {
+        String wireApi = provider.getWireApi();
+        return wireApi != null && OPENAI_WIRE_API.equalsIgnoreCase(wireApi.trim());
     }
 
     private boolean isAnthropicCompatibleProvider(String lowerUrl) {
@@ -419,7 +435,7 @@ public class ProviderService {
         if (normalizedUrl.endsWith("/v1/chat/completions") || normalizedUrl.endsWith("/chat/completions")) {
             return normalizedUrl;
         }
-        if (normalizedUrl.endsWith("/v1") || normalizedUrl.endsWith("/api/v3")) {
+        if (normalizedUrl.endsWith("/v1") || normalizedUrl.endsWith("/v2") || normalizedUrl.endsWith("/api/v3")) {
             return normalizedUrl + "/chat/completions";
         }
         return normalizedUrl + "/v1/chat/completions";
@@ -606,12 +622,14 @@ public class ProviderService {
         }
     }
 
-    private HttpRequest buildHttpRequest(String testUrl, String requestBody, ProviderApiStyle apiStyle, String apiKey) {
+    private HttpRequest buildHttpRequest(String testUrl, String requestBody, ProviderApiStyle apiStyle, String apiKey,
+                                         UpstreamRequestConfig upstreamConfig) {
         HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
                 .uri(URI.create(testUrl))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                 .timeout(Duration.ofSeconds(30));
+        upstreamConfig.headers().forEach(requestBuilder::header);
 
         if (apiStyle == ProviderApiStyle.ANTHROPIC) {
             requestBuilder

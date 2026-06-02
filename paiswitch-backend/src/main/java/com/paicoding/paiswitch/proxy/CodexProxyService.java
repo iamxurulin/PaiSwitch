@@ -69,7 +69,8 @@ public class CodexProxyService {
                 chatObj.remove("stream_options");
                 TokenBudgetPolicy.applyProviderMinimums(providerCode, chatObj);
 
-                String upstreamUrl = trimTrailingSlash(provider.getBaseUrl()) + "/chat/completions";
+                UpstreamRequestConfig upstreamConfig = UpstreamRequestConfig.fromBaseUrl(provider.getBaseUrl());
+                String upstreamUrl = trimTrailingSlash(upstreamConfig.baseUrl()) + "/chat/completions";
                 String requestJson = objectMapper.writeValueAsString(chatRequest);
                 log.info("Forwarding to {} (model={}, bytes={})", upstreamUrl,
                         chatRequest.path("model").asText("?"), requestJson.length());
@@ -79,6 +80,7 @@ public class CodexProxyService {
                         .timeout(Duration.ofMinutes(2))
                         .header("Content-Type", "application/json")
                         .POST(HttpRequest.BodyPublishers.ofString(requestJson));
+                upstreamConfig.headers().forEach(reqBuilder::header);
                 if (authorization != null && !authorization.isBlank()) {
                     reqBuilder.header("Authorization", authorization);
                 }

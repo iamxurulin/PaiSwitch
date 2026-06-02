@@ -116,6 +116,14 @@ public class DefaultUserInitializer implements CommandLineRunner {
                 "chat",
                 "skyclaw",
                 6);
+        createCodexBuiltinProviderIfMissing("xfyun-maas", "iFlytek Spark MaaS",
+                "讯飞星辰 MaaS OpenAI-compatible chat-completions",
+                "https://maas-api.cn-huabei-1.xf-yun.com/v2",
+                "2615338780587020",
+                null,
+                "chat",
+                "xfyun_maas",
+                7);
         // Claude Code side: SkyClaw only exposes OpenAI chat-completions. base_url
         // points at the upstream; wire_api='openai' makes the settings writer route
         // ANTHROPIC_BASE_URL through the local /claude-proxy/{code} translator so
@@ -127,6 +135,13 @@ public class DefaultUserInitializer implements CommandLineRunner {
                 "skywork-ai/skyclaw-v1-lite",
                 "openai",
                 5);
+        createBuiltinProviderWithWireApi("xfyun-maas", "iFlytek Spark MaaS",
+                "讯飞星辰 MaaS OpenAI-compatible inference via local Claude proxy",
+                "https://maas-api.cn-huabei-1.xf-yun.com/v2",
+                "2615338780587020",
+                null,
+                "openai",
+                6);
     }
 
     private void createBuiltinProviderIfMissing(String code, String name, String description, String baseUrl,

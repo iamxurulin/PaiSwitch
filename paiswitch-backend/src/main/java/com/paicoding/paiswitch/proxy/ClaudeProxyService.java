@@ -74,7 +74,8 @@ public class ClaudeProxyService {
                 // echoing back something different.
                 String requestedModel = chatRequest.path("model").asText(requestBody.path("model").asText(""));
 
-                String upstreamUrl = trimTrailingSlash(provider.getBaseUrl()) + "/chat/completions";
+                UpstreamRequestConfig upstreamConfig = UpstreamRequestConfig.fromBaseUrl(provider.getBaseUrl());
+                String upstreamUrl = trimTrailingSlash(upstreamConfig.baseUrl()) + "/chat/completions";
                 String requestJson = objectMapper.writeValueAsString(chatRequest);
                 log.info("Forwarding to {} (model={}, bytes={})", upstreamUrl, requestedModel, requestJson.length());
 
@@ -83,6 +84,7 @@ public class ClaudeProxyService {
                         .timeout(Duration.ofMinutes(2))
                         .header("Content-Type", "application/json")
                         .POST(HttpRequest.BodyPublishers.ofString(requestJson));
+                upstreamConfig.headers().forEach(reqBuilder::header);
                 if (apiKey != null && !apiKey.isBlank()) {
                     reqBuilder.header("Authorization", "Bearer " + apiKey);
                 }
