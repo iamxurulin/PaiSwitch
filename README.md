@@ -154,7 +154,14 @@ src-tauri/target/release/bundle/dmg/*.dmg
 src-tauri/target/release/bundle/macos/*.app
 ```
 
-对外发布优先上传 `.dmg`；`.app` 适合作为 zip 备用包。
+对外发布优先上传 `.dmg`；`.app` 适合作为 zip 备用包。Release 资产会按构建架构命名，例如 `PaiSwitch-1.0.0-macos-arm64.dmg` 或 `PaiSwitch-1.0.0-macos-x64.dmg`。
+
+未配置 Apple Developer ID 签名时，macOS 首次打开会拦截。免费分发阶段可以让用户按下面方式安装：
+
+1. 下载 Release 页面里的 `.dmg`。
+2. 打开 `.dmg`，把 `PaiSwitch.app` 拖到 Applications。
+3. 第一次启动时不要双击，右键点击 `PaiSwitch.app`，选择“打开”。
+4. 如果仍被拦截，进入“系统设置” -> “隐私与安全性”，在安全提示处选择“仍要打开”。
 
 ---
 
@@ -340,9 +347,19 @@ git tag v1.0.0
 git push origin v1.0.0
 ```
 
-在 GitHub 创建并发布同名 Release 后，`.github/workflows/release-desktop.yml` 会在 macOS runner 上构建 `.dmg` 和 `.app.zip`，并上传 `SHA256SUMS.txt`。
+在 GitHub 创建并发布同名 Release 后，`.github/workflows/release-desktop.yml` 会在 macOS runner 上构建 `.dmg` 和 `.app.zip`，并上传 `SHA256SUMS.txt`。资产名会包含构建架构，例如 `PaiSwitch-1.0.0-macos-arm64.dmg`。
 
-当前 workflow 使用未签名包，首次打开可能触发 macOS Gatekeeper 提示。面向更大范围用户分发时，建议接入 Apple Developer ID 签名和 notarization。
+如果不配置 Apple 凭证，workflow 会上传未签名包，首次打开可能触发 macOS Gatekeeper 提示。面向更大范围用户分发时，建议在 GitHub Secrets 中配置 Apple Developer ID 签名和 notarization：
+
+| Secret | 说明 |
+|--------|------|
+| `APPLE_CERTIFICATE` | Developer ID Application 证书的 base64 编码 p12 |
+| `APPLE_CERTIFICATE_PASSWORD` | p12 证书密码 |
+| `APPLE_API_KEY_ID` | App Store Connect API Key ID |
+| `APPLE_API_ISSUER` | App Store Connect Issuer ID |
+| `APPLE_API_PRIVATE_KEY` | App Store Connect `.p8` 私钥内容 |
+| `APPLE_SIGNING_IDENTITY` | 可选，指定 codesign identity；留空时 Tauri 会从证书推断 |
+| `APPLE_PROVIDER_SHORT_NAME` | 可选，旧团队账号需要的 provider short name |
 
 ---
 

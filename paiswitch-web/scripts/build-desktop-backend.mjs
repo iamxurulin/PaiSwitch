@@ -91,7 +91,7 @@ function buildRuntime() {
     '--no-header-files',
     '--no-man-pages',
     '--strip-debug',
-    '--compress=zip-6',
+    '--compress=2',
     '--output',
     bundledRuntimeDir
   ])

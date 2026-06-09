@@ -50,6 +50,8 @@ src-tauri/target/release/bundle/dmg/*.dmg
 
 GitHub Release 发布由仓库根目录的 `.github/workflows/release-desktop.yml` 自动完成。
 
+未配置 Apple Developer ID 签名时，Release 包首次打开会触发 macOS 安全提示。用户可右键点击 `PaiSwitch.app` 选择“打开”，或在“系统设置” -> “隐私与安全性”中允许打开。
+
 ## 项目结构
 
 ```
