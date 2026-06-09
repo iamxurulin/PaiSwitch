@@ -71,6 +71,32 @@ class ChatResponseValidatorTest {
     }
 
     @Test
+    void emptyAssistantOutputIsCaught() throws Exception {
+        String body = """
+                {
+                  "choices": [
+                    {"message": {"role": "assistant", "content": "", "tool_calls": []}}
+                  ]
+                }
+                """;
+        String msg = ChatResponseValidator.describeBodyLevelError(mapper.readTree(body));
+        assertNotNull(msg);
+        assertTrue(msg.contains("no assistant text"), msg);
+    }
+
+    @Test
+    void reasoningContentCountsAsUsableOutput() throws Exception {
+        String body = """
+                {
+                  "choices": [
+                    {"message": {"role": "assistant", "content": "", "reasoning_content": "thinking"}}
+                  ]
+                }
+                """;
+        assertNull(ChatResponseValidator.describeBodyLevelError(mapper.readTree(body)));
+    }
+
+    @Test
     void nullBodyIsReported() {
         String msg = ChatResponseValidator.describeBodyLevelError(null);
         assertNotNull(msg);

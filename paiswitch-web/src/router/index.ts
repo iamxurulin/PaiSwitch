@@ -1,9 +1,13 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHashHistory, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useProviderStore } from '@/stores/provider'
 
+function isTauriRuntime(): boolean {
+  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
+}
+
 const router = createRouter({
-  history: createWebHistory(),
+  history: isTauriRuntime() ? createWebHashHistory() : createWebHistory(),
   routes: [
     {
       path: '/login',

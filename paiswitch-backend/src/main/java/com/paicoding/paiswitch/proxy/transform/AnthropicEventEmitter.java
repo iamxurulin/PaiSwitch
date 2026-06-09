@@ -202,7 +202,7 @@ public class AnthropicEventEmitter {
     private String extractText(JsonNode message) {
         if (message == null || message.isNull()) return "";
         JsonNode content = message.get("content");
-        if (content == null || content.isNull()) return "";
+        if (content == null || content.isNull()) return message.path("reasoning_content").asText("");
         if (content.isTextual()) return content.asText();
         if (content.isArray()) {
             StringBuilder sb = new StringBuilder();
@@ -211,9 +211,9 @@ public class AnthropicEventEmitter {
                     sb.append(part.path("text").asText(""));
                 }
             }
-            return sb.toString();
+            return !sb.isEmpty() ? sb.toString() : message.path("reasoning_content").asText("");
         }
-        return "";
+        return message.path("reasoning_content").asText("");
     }
 
     /**

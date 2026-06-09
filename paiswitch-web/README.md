@@ -35,6 +35,21 @@ npm run dev
 npm run build
 ```
 
+### 桌面发行包
+
+```bash
+npm run desktop:build
+```
+
+该命令会先构建后端 Jar 和内置 Java Runtime，再通过 Tauri 生成 macOS `.app` 与 `.dmg`：
+
+```text
+src-tauri/target/release/bundle/macos/*.app
+src-tauri/target/release/bundle/dmg/*.dmg
+```
+
+GitHub Release 发布由仓库根目录的 `.github/workflows/release-desktop.yml` 自动完成。
+
 ## 项目结构
 
 ```

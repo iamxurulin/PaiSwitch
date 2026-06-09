@@ -45,7 +45,10 @@ public class AnthropicToChatTransformer {
             out.set("max_tokens", body.get("max_tokens"));
         }
 
-        for (String key : new String[]{"temperature", "top_p", "stream", "user", "top_k"}) {
+        // `top_k` is an Anthropic-only sampling parameter. Several
+        // OpenAI-compatible providers, including XFYUN MaaS, reject it as an
+        // invalid request parameter.
+        for (String key : new String[]{"temperature", "top_p", "stream", "user"}) {
             if (body.has(key)) {
                 out.set(key, body.get(key));
             }
@@ -153,8 +156,11 @@ public class AnthropicToChatTransformer {
             } else if ("user".equals(role)) {
                 explodeUserBlocks(content, out);
             } else {
-                // system or unknown: collapse to text.
-                addSimpleMessage(out, role, joinTextBlocks(content));
+                // Claude Code may inject system reminders inside messages after
+                // user turns. Several OpenAI-compatible upstreams reject system
+                // messages outside the leading top-level system slot, so keep
+                // the content but carry it as a user message.
+                addSimpleMessage(out, "user", joinTextBlocks(content));
             }
         }
     }
@@ -299,7 +305,8 @@ public class AnthropicToChatTransformer {
 
     private String chatRoleOf(String anthropicRole) {
         return switch (anthropicRole) {
-            case "system", "user", "assistant", "tool" -> anthropicRole;
+            case "user", "assistant", "tool" -> anthropicRole;
+            case "system" -> "user";
             default -> "user";
         };
     }

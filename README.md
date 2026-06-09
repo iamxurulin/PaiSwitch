@@ -129,13 +129,32 @@ npm run dev
 http://localhost:3000
 ```
 
-### macOS 菜单栏应用
+### macOS 本地应用
 
 ```bash
 open ClaudeModelSwitcher.xcodeproj
 ```
 
 在 Xcode 中选择 `PaiSwitch` 目标并运行。macOS 应用支持本地切换、Keychain 存储、在线登录、AI 助手与 Claude Code Skills 管理。
+
+### macOS 桌面发行包
+
+桌面发行包使用 Tauri 打包，会内置 Spring Boot 后端 Jar 和精简 Java Runtime，不要求用户单独安装 Java。
+
+```bash
+cd paiswitch-web
+npm install
+npm run desktop:build
+```
+
+构建产物：
+
+```text
+src-tauri/target/release/bundle/dmg/*.dmg
+src-tauri/target/release/bundle/macos/*.app
+```
+
+对外发布优先上传 `.dmg`；`.app` 适合作为 zip 备用包。
 
 ---
 
@@ -307,11 +326,23 @@ cd paiswitch-web
 npm run build
 ```
 
-macOS 构建：
+macOS 桌面包构建：
 
 ```bash
-xcodebuild -project ClaudeModelSwitcher.xcodeproj -scheme PaiSwitch -configuration Release
+cd paiswitch-web
+npm run desktop:build
 ```
+
+发布到 GitHub Release：
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+在 GitHub 创建并发布同名 Release 后，`.github/workflows/release-desktop.yml` 会在 macOS runner 上构建 `.dmg` 和 `.app.zip`，并上传 `SHA256SUMS.txt`。
+
+当前 workflow 使用未签名包，首次打开可能触发 macOS Gatekeeper 提示。面向更大范围用户分发时，建议接入 Apple Developer ID 签名和 notarization。
 
 ---
 

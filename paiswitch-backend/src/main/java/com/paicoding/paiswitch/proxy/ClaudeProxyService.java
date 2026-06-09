@@ -68,6 +68,12 @@ public class ClaudeProxyService {
                 chatObj.put("stream", false);
                 chatObj.remove("stream_options");
                 TokenBudgetPolicy.applyProviderMinimums(providerCode, chatObj);
+                XfyunRequestAdapter.AdaptedRequest adaptedRequest = XfyunRequestAdapter.adapt(providerCode, chatObj);
+                chatObj = adaptedRequest.request();
+                if (adaptedRequest.toolsStripped()) {
+                    log.info("XFYUN MaaS model={} does not support tools; stripped tool protocol for Claude proxy",
+                            chatObj.path("model").asText(""));
+                }
 
                 // Capture the model the client asked for — used when emitting message_start
                 // so Claude Code's UI shows e.g. "skywork-ai/skyclaw-v1" rather than upstream
@@ -105,7 +111,7 @@ public class ClaudeProxyService {
                     return;
                 }
 
-                JsonNode chatResponse = objectMapper.readTree(upstream.body());
+                JsonNode chatResponse = adaptedRequest.restoreResponseToolNames(objectMapper.readTree(upstream.body()));
                 String bodyError = ChatResponseValidator.describeBodyLevelError(chatResponse);
                 if (bodyError != null) {
                     log.warn("Upstream HTTP 2xx but body-level error: {}", bodyError);

@@ -55,6 +55,25 @@ class AnthropicToChatTransformerTest {
     }
 
     @Test
+    void systemMessagesInsideAnthropicMessagesBecomeUserMessages() throws Exception {
+        JsonNode out = transformer.anthropicToChat(mapper.readTree("""
+                {
+                  "system": "leading system",
+                  "messages": [
+                    {"role": "user", "content": "Hi"},
+                    {"role": "system", "content": "system reminder"}
+                  ]
+                }
+                """));
+
+        JsonNode messages = out.get("messages");
+        assertEquals("system", messages.get(0).get("role").asText());
+        assertEquals("user", messages.get(1).get("role").asText());
+        assertEquals("user", messages.get(2).get("role").asText());
+        assertEquals("system reminder", messages.get(2).get("content").asText());
+    }
+
+    @Test
     void assistantToolUseBecomesToolCalls() throws Exception {
         JsonNode out = transformer.anthropicToChat(mapper.readTree("""
                 {
@@ -184,6 +203,19 @@ class AnthropicToChatTransformerTest {
                 """));
         assertTrue(out.has("stop"));
         assertEquals("END", out.get("stop").get(0).asText());
+    }
+
+    @Test
+    void topKIsNotForwardedToOpenAiCompatibleUpstreams() throws Exception {
+        JsonNode out = transformer.anthropicToChat(mapper.readTree("""
+                {
+                  "messages": [{"role": "user", "content": "x"}],
+                  "temperature": 0.3,
+                  "top_k": 250
+                }
+                """));
+        assertEquals(0.3, out.get("temperature").asDouble());
+        assertFalse(out.has("top_k"));
     }
 
     @Test

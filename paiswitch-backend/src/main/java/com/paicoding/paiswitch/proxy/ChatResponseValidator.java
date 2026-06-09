@@ -35,7 +35,42 @@ public final class ChatResponseValidator {
         if (choices == null || !choices.isArray() || choices.isEmpty()) {
             return "Upstream response missing 'choices' array (likely body-level error)";
         }
+        if (!hasUsableAssistantOutput(choices.get(0))) {
+            return "Upstream response has no assistant text or tool calls";
+        }
         return null;
+    }
+
+    private static boolean hasUsableAssistantOutput(JsonNode choice) {
+        JsonNode message = choice == null ? null : choice.get("message");
+        if (message == null || !message.isObject()) {
+            return false;
+        }
+        if (hasText(message.get("content")) || hasText(message.get("reasoning_content"))) {
+            return true;
+        }
+        JsonNode toolCalls = message.get("tool_calls");
+        return toolCalls != null && toolCalls.isArray() && !toolCalls.isEmpty();
+    }
+
+    private static boolean hasText(JsonNode node) {
+        if (node == null || node.isNull()) {
+            return false;
+        }
+        if (node.isTextual()) {
+            return !node.asText().isBlank();
+        }
+        if (node.isArray()) {
+            for (JsonNode part : node) {
+                if (part.isTextual() && !part.asText().isBlank()) {
+                    return true;
+                }
+                if (part.isObject() && part.has("text") && !part.path("text").asText("").isBlank()) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private static String formatErrorObject(JsonNode body, JsonNode error) {

@@ -73,6 +73,7 @@ export default defineConfig(async ({ mode }) => {
   const apiProxyTarget = await resolveApiProxyTarget(env.VITE_API_PROXY_TARGET)
 
   return {
+    base: './',
     plugins: [vue()],
     resolve: {
       alias: {

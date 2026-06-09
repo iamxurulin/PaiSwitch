@@ -2,11 +2,23 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import router from './router'
 import App from './App.vue'
+import DesktopStartupError from './DesktopStartupError.vue'
 import './assets/main.css'
+import { configureDesktopApiBaseURL } from './desktop'
 
-const app = createApp(App)
+async function bootstrap() {
+  const desktopApi = await configureDesktopApiBaseURL()
 
-app.use(createPinia())
-app.use(router)
+  const app = desktopApi.ok
+    ? createApp(App)
+    : createApp(DesktopStartupError, { message: desktopApi.error })
 
-app.mount('#app')
+  app.use(createPinia())
+  if (desktopApi.ok) {
+    app.use(router)
+  }
+
+  app.mount('#app')
+}
+
+bootstrap()

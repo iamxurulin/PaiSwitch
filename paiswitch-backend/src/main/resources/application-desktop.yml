@@ -1,0 +1,35 @@
+server:
+  port: ${PAISWITCH_BACKEND_PORT:8086}
+
+spring:
+  devtools:
+    restart:
+      enabled: false
+    livereload:
+      enabled: false
+
+  datasource:
+    url: jdbc:h2:file:${PAISWITCH_DATA_DIR:${user.home}/.paiswitch}/paiswitch;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;NON_KEYWORDS=USER
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+
+  flyway:
+    enabled: false
+
+logging:
+  file:
+    name: ${PAISWITCH_DATA_DIR:${user.home}/.paiswitch}/logs/backend.log
+  level:
+    com.paicoding.paiswitch: INFO
+    org.springframework.ai: INFO

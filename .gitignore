@@ -39,6 +39,10 @@ xcuserdata/
 *.perspectivev3
 !default.perspectivev3
 /paiswitch-web/node_modules
+/paiswitch-web/src-tauri/resources/backend/*.jar
+/paiswitch-web/src-tauri/resources/runtime
+/paiswitch-web/src-tauri/target
+/paiswitch-web/release-assets
 /paiswitch-backend/target
 /.idea
 .env

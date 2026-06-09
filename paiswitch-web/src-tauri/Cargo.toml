@@ -1,0 +1,23 @@
+[package]
+name = "paiswitch-desktop"
+version = "1.0.0"
+description = "PaiSwitch desktop shell"
+authors = ["PaiCoding"]
+license = "MIT"
+repository = "https://github.com/itwanger/PaiSwitch"
+edition = "2021"
+rust-version = "1.85"
+
+[lib]
+name = "paiswitch_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+fs2 = "0.4"

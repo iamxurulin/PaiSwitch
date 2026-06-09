@@ -1,0 +1,110 @@
+name: Release Desktop
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: Existing tag or release name, for example v1.0.0
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  macos:
+    name: Build macOS installer
+    runs-on: macos-14
+    env:
+      LANG: en_US.UTF-8
+      LC_ALL: en_US.UTF-8
+
+    steps:
+      - name: Resolve release tag
+        id: release
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            echo "tag=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${{ inputs.tag_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check out release source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.release.outputs.tag }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: paiswitch-web/package-lock.json
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: maven
+
+      - name: Set up Rust
+        shell: bash
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          rustc --version
+          cargo --version
+
+      - name: Install frontend dependencies
+        working-directory: paiswitch-web
+        run: npm ci
+
+      - name: Build desktop app
+        working-directory: paiswitch-web
+        run: |
+          npm run build:backend
+          npm run tauri -- build --bundles app,dmg --ci --no-sign
+
+      - name: Package release assets
+        id: assets
+        working-directory: paiswitch-web
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TAG="${{ steps.release.outputs.tag }}"
+          VERSION="${TAG#v}"
+          ASSET_PREFIX="PaiSwitch-${VERSION}-macos"
+          ASSET_DIR="release-assets"
+          APP_PATH="$(find src-tauri/target/release/bundle/macos -maxdepth 1 -name '*.app' -print -quit)"
+          DMG_PATH="$(find src-tauri/target/release/bundle/dmg -maxdepth 1 -name '*.dmg' -print -quit)"
+
+          if [ -z "$APP_PATH" ]; then
+            echo "No .app bundle found" >&2
+            exit 1
+          fi
+
+          if [ -z "$DMG_PATH" ]; then
+            echo "No .dmg installer found" >&2
+            exit 1
+          fi
+
+          rm -rf "$ASSET_DIR"
+          mkdir -p "$ASSET_DIR"
+          ditto -c -k --keepParent "$APP_PATH" "$ASSET_DIR/${ASSET_PREFIX}.app.zip"
+          cp "$DMG_PATH" "$ASSET_DIR/${ASSET_PREFIX}.dmg"
+          shasum -a 256 "$ASSET_DIR"/* > "$ASSET_DIR/SHA256SUMS.txt"
+
+      - name: Upload assets to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        working-directory: paiswitch-web
+        shell: bash
+        run: |
+          gh release view "$RELEASE_TAG" >/dev/null 2>&1 || \
+            gh release create "$RELEASE_TAG" --draft --title "$RELEASE_TAG" --notes "Desktop release $RELEASE_TAG"
+          gh release upload "$RELEASE_TAG" release-assets/* --clobber

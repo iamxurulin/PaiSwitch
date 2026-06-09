@@ -136,7 +136,9 @@ public class SettingsWriterService {
 
     private boolean needsProxy(ModelProvider provider) {
         String wireApi = provider.getWireApi();
-        return wireApi != null && OPENAI_WIRE_API.equalsIgnoreCase(wireApi.trim());
+        return wireApi != null && OPENAI_WIRE_API.equalsIgnoreCase(wireApi.trim())
+                || !Boolean.TRUE.equals(provider.getIsBuiltin())
+                && (wireApi == null || wireApi.isBlank());
     }
 
     private String normalizeClaudeCodeBaseUrl(String baseUrl) {

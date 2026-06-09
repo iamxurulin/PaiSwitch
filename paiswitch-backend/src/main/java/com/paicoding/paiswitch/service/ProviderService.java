@@ -99,7 +99,7 @@ public class ProviderService {
                 .isActive(true)
                 .sortOrder(100)
                 .targetTool(tool)
-                .wireApi(tool == TargetTool.CODEX ? "chat" : null)
+                .wireApi(tool == TargetTool.CODEX ? "chat" : OPENAI_WIRE_API)
                 .providerKey(tool == TargetTool.CODEX ? "custom_" + code : null)
                 .build();
 
@@ -406,7 +406,10 @@ public class ProviderService {
 
     private boolean isOpenAiWireProvider(ModelProvider provider) {
         String wireApi = provider.getWireApi();
-        return wireApi != null && OPENAI_WIRE_API.equalsIgnoreCase(wireApi.trim());
+        return wireApi != null && OPENAI_WIRE_API.equalsIgnoreCase(wireApi.trim())
+                || provider.getTargetTool() == TargetTool.CLAUDE_CODE
+                && !Boolean.TRUE.equals(provider.getIsBuiltin())
+                && (wireApi == null || wireApi.isBlank());
     }
 
     private boolean isAnthropicCompatibleProvider(String lowerUrl) {

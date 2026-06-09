@@ -2,13 +2,19 @@ import axios from 'axios'
 import type { ApiResponse } from '@/types'
 import { useAuthStore } from '@/stores/auth'
 
+const apiBaseURL = import.meta.env.VITE_API_BASE_URL ?? '/api/v1'
+
 const api = axios.create({
-  baseURL: '/api/v1',
+  baseURL: apiBaseURL,
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json'
   }
 })
+
+export function setApiBaseURL(baseURL: string) {
+  api.defaults.baseURL = baseURL
+}
 
 api.interceptors.request.use(
   (config) => {
