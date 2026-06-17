@@ -13,6 +13,113 @@ permissions:
   contents: write
 
 jobs:
+  windows:
+    name: Build Windows installer
+    runs-on: windows-latest
+    env:
+      LANG: en_US.UTF-8
+      LC_ALL: en_US.UTF-8
+
+    steps:
+      - name: Resolve release tag
+        id: release
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            echo "tag=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${{ inputs.tag_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check out release source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.release.outputs.tag }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: paiswitch-web/package-lock.json
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: maven
+
+      - name: Set up Rust
+        shell: bash
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          rustc --version
+          cargo --version
+
+      - name: Install frontend dependencies
+        working-directory: paiswitch-web
+        run: npm ci
+
+      - name: Build backend JAR and bundle runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          node paiswitch-web/scripts/build-desktop-backend.mjs
+
+      - name: Build desktop app
+        working-directory: paiswitch-web
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # On Windows, Tauri needs WebView2 runtime which is pre-installed on windows-latest
+          BUILD_ARGS=(build --bundles nsis --ci)
+
+          npm run tauri -- "${BUILD_ARGS[@]}"
+
+      - name: Locate Windows bundles
+        id: bundles
+        shell: bash
+        run: |
+          set -euo pipefail
+          NSIS_PATH="$(find src-tauri/target/release/bundle/nsis -maxdepth 1 -name '*Setup.exe' -print -quit)"
+          if [ -z "$NSIS_PATH" ]; then
+            echo "No .exe installer found" >&2
+            exit 1
+          fi
+          echo "nsis=$NSIS_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Package release assets
+        id: assets
+        working-directory: paiswitch-web
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TAG="${{ steps.release.outputs.tag }}"
+          VERSION="${TAG#v}"
+          ASSET_DIR="release-assets"
+          NSIS_PATH="${{ steps.bundles.outputs.nsis }}"
+          ASSET_NAME="PaiSwitch-${VERSION}-windows-x64.exe"
+
+          rm -rf "$ASSET_DIR"
+          mkdir -p "$ASSET_DIR"
+          cp "$NSIS_PATH" "$ASSET_DIR/$ASSET_NAME"
+          sha256sum "$ASSET_DIR"/* > "$ASSET_DIR/SHA256SUMS.txt"
+
+      - name: Upload assets to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        working-directory: paiswitch-web
+        shell: bash
+        run: |
+          gh release view "$RELEASE_TAG" >/dev/null 2>&1 || \
+            gh release create "$RELEASE_TAG" --draft --title "$RELEASE_TAG" --notes "Desktop release $RELEASE_TAG"
+          gh release upload "$RELEASE_TAG" release-assets/* --clobber
+
   macos:
     name: Build macOS installer
     runs-on: macos-14

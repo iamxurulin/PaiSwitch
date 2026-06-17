@@ -65,6 +65,11 @@ function resolveJavaHome() {
     return execFileSync('/usr/libexec/java_home', { encoding: 'utf8' }).trim()
   }
 
+  // On Windows, JAVA_HOME is typically set by actions/setup-java
+  if (process.platform === 'win32' && process.env.JAVA_HOME) {
+    return process.env.JAVA_HOME.replace(/\\/g, '/')
+  }
+
   throw new Error('JAVA_HOME is required to build the bundled desktop runtime')
 }
 
@@ -97,7 +102,10 @@ function buildRuntime() {
   ])
 
   materializeSymlinks(bundledRuntimeDir)
-  run('chmod', ['-R', 'u+rwX', bundledRuntimeDir])
+
+  if (process.platform !== 'win32') {
+    run('chmod', ['-R', 'u+rwX', bundledRuntimeDir])
+  }
   rmSync(resolve(bundledRuntimeDir, 'legal'), { recursive: true, force: true })
 }
 

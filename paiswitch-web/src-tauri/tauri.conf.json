@@ -28,7 +28,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["app", "dmg"],
+    "targets": ["app", "dmg", "zip", "nsis"],
     "resources": [
       "resources/backend/paiswitch-backend.jar",
       "resources/runtime"
@@ -39,6 +39,14 @@
       "icons/128x128@2x.png",
       "icons/icon.png"
     ],
+    "windows": {
+      "nsis": {
+        "installerIcon": "icons/icon.ico",
+        "headerIcon": "icons/icon.ico",
+        "installMode": "perMachine",
+        "languages": ["SimpChinese", "English"]
+      }
+    },
     "macOS": {
       "minimumSystemVersion": "12.0"
     }
