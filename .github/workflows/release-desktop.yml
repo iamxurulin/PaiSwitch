@@ -54,35 +54,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          MVN_PATH=$(where mvn 2>/dev/null || echo "")
-          if [ -n "$MVN_PATH" ]; then
-            echo "Found Maven at $MVN_PATH"
+          if command -v mvn &>/dev/null; then
+            echo "Maven already on PATH"
             mvn --version
           else
-            echo "Maven not on PATH, installing via SDKMAN fallback..."
-            # Try choco first
-            if command -v choco &>/dev/null; then
-              choco install maven -y --no-progress 2>/dev/null && mvn --version && exit 0
-            fi
-            # Manual install: download zip and extract
+            echo "Maven not on PATH, installing Apache Maven 3.9.9..."
             MAVEN_VERSION=3.9.9
-            MAVEN_URL="https://dlcdn.apache.org/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.zip"
-            echo "Downloading Apache Maven ${MAVEN_VERSION}..."
-            curl -fsSL "$MAVEN_URL" -o /tmp/maven-bin.zip
-            7z x /tmp/maven-bin.zip -o/d/programs/maven -y 2>/dev/null || \
-              tar -xf /tmp/maven-bin.zip -C /tmp 2>/dev/null
-            # The zip extracts to a directory like apache-maven-3.9.9
-            EXTRACTED=$(ls -d /tmp/apache-maven-* 2>/dev/null || ls -d /d/programs/maven/apache-maven-* 2>/dev/null || echo "")
-            if [ -n "$EXTRACTED" ]; then
-              if [ -d "/d/programs/maven" ] && [ "$(ls /d/programs/maven/ | head -1)" = "apache-maven-${MAVEN_VERSION}" ]; then
-                mvn_bin="/d/programs/maven/apache-maven-${MAVEN_VERSION}/bin"
-              else
-                mkdir -p /d/programs/maven
-                mv "$EXTRACTED" /d/programs/maven/
-                mvn_bin="/d/programs/maven/$(basename "$EXTRACTED")/bin"
-              fi
-              echo "$mvn_bin" >> "$GITHUB_PATH"
-            fi
+            curl -fsSL "https://dlcdn.apache.org/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.zip" -o /tmp/maven-bin.zip
+            EXTRACT_DIR=$(mktemp -d)
+            unzip -q /tmp/maven-bin.zip -d "$EXTRACT_DIR"
+            mvn_bin="$EXTRACT_DIR/apache-maven-${MAVEN_VERSION}/bin"
+            echo "$mvn_bin" >> "$GITHUB_PATH"
+            echo "MAVEN_HOME=$mvn_bin" >> "$GITHUB_ENV"
             mvn --version
           fi
 
