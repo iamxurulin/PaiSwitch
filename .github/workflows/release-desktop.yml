@@ -50,10 +50,23 @@ jobs:
           java-version: 17
           cache: maven
 
-      - name: Set up Maven
-        uses: stCarolas/setup-maven@v5
-        with:
-          maven-version: 3.9.9
+      - name: Verify Maven is available
+        shell: bash
+        run: |
+          set -euo pipefail
+          # windows-latest runner ships Maven but may not be on PATH
+          MVN_PATH=$(where mvn 2>/dev/null || echo "")
+          if [ -z "$MVN_PATH" ]; then
+            # Fallback: install Apache Maven explicitly
+            maven_version=3.9.6
+            maven_url="https://archive.apache.org/dist/maven/maven-3/${maven_version}/binaries/apache-maven-${maven_version}-bin.zip"
+            echo "Maven not on PATH, installing ${maven_version}..."
+            curl -fsSL "$maven_url" -o /tmp/maven.zip
+            mkdir -p /d/programs/maven
+            tar -xzf /tmp/maven.zip -C /d/programs/maven --strip-components=1
+            echo "/d/programs/maven/bin" >> "$GITHUB_PATH"
+          fi
+          mvn --version
 
       - name: Set up Rust
         shell: bash
