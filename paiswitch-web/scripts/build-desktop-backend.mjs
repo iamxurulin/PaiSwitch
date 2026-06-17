@@ -50,13 +50,17 @@ const runtimeModules = [
 ]
 
 function run(command, args, options = {}) {
-  // On Windows, execFileSync needs the .cmd extension for shell-less spawning
-  const resolvedCommand = platform() === 'win32' ? `${command}.cmd` : command
-  execFileSync(resolvedCommand, args, {
+  const opts = {
     cwd: repoRoot,
     stdio: 'inherit',
     ...options
-  })
+  }
+  if (platform() === 'win32') {
+    // On Windows, .cmd files require shell mode for argument passing
+    // otherwise execFileSync throws EINVAL with non-empty args array
+    opts.shell = true
+  }
+  execFileSync(command, args, opts)
 }
 
 function resolveJavaHome() {
