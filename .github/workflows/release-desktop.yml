@@ -50,6 +50,11 @@ jobs:
           java-version: 17
           cache: maven
 
+      - name: Set up Maven
+        uses: stCarolas/setup-maven@v5
+        with:
+          maven-version: 3.9.9
+
       - name: Set up Rust
         shell: bash
         run: |
