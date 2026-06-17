@@ -12,6 +12,7 @@ import {
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
+import { platform } from 'node:os'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const webRoot = resolve(__dirname, '..')
@@ -49,7 +50,9 @@ const runtimeModules = [
 ]
 
 function run(command, args, options = {}) {
-  execFileSync(command, args, {
+  // On Windows, execFileSync needs the .cmd extension for shell-less spawning
+  const resolvedCommand = platform() === 'win32' ? `${command}.cmd` : command
+  execFileSync(resolvedCommand, args, {
     cwd: repoRoot,
     stdio: 'inherit',
     ...options
