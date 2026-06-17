@@ -88,7 +88,8 @@ function buildBackendJar() {
 
 function buildRuntime() {
   const javaHome = resolveJavaHome()
-  const jlink = resolve(javaHome, 'bin/jlink')
+  const jlinkName = platform() === 'win32' ? 'jlink.exe' : 'jlink'
+  const jlink = resolve(javaHome, 'bin', jlinkName)
 
   if (!existsSync(jlink)) {
     throw new Error(`jlink not found at ${jlink}`)
