@@ -50,23 +50,41 @@ jobs:
           java-version: 17
           cache: maven
 
-      - name: Verify Maven is available
+      - name: Set up Maven
         shell: bash
         run: |
           set -euo pipefail
-          # windows-latest runner ships Maven but may not be on PATH
           MVN_PATH=$(where mvn 2>/dev/null || echo "")
-          if [ -z "$MVN_PATH" ]; then
-            # Fallback: install Apache Maven explicitly
-            maven_version=3.9.6
-            maven_url="https://archive.apache.org/dist/maven/maven-3/${maven_version}/binaries/apache-maven-${maven_version}-bin.zip"
-            echo "Maven not on PATH, installing ${maven_version}..."
-            curl -fsSL "$maven_url" -o /tmp/maven.zip
-            mkdir -p /d/programs/maven
-            tar -xzf /tmp/maven.zip -C /d/programs/maven --strip-components=1
-            echo "/d/programs/maven/bin" >> "$GITHUB_PATH"
+          if [ -n "$MVN_PATH" ]; then
+            echo "Found Maven at $MVN_PATH"
+            mvn --version
+          else
+            echo "Maven not on PATH, installing via SDKMAN fallback..."
+            # Try choco first
+            if command -v choco &>/dev/null; then
+              choco install maven -y --no-progress 2>/dev/null && mvn --version && exit 0
+            fi
+            # Manual install: download zip and extract
+            MAVEN_VERSION=3.9.9
+            MAVEN_URL="https://dlcdn.apache.org/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.zip"
+            echo "Downloading Apache Maven ${MAVEN_VERSION}..."
+            curl -fsSL "$MAVEN_URL" -o /tmp/maven-bin.zip
+            7z x /tmp/maven-bin.zip -o/d/programs/maven -y 2>/dev/null || \
+              tar -xf /tmp/maven-bin.zip -C /tmp 2>/dev/null
+            # The zip extracts to a directory like apache-maven-3.9.9
+            EXTRACTED=$(ls -d /tmp/apache-maven-* 2>/dev/null || ls -d /d/programs/maven/apache-maven-* 2>/dev/null || echo "")
+            if [ -n "$EXTRACTED" ]; then
+              if [ -d "/d/programs/maven" ] && [ "$(ls /d/programs/maven/ | head -1)" = "apache-maven-${MAVEN_VERSION}" ]; then
+                mvn_bin="/d/programs/maven/apache-maven-${MAVEN_VERSION}/bin"
+              else
+                mkdir -p /d/programs/maven
+                mv "$EXTRACTED" /d/programs/maven/
+                mvn_bin="/d/programs/maven/$(basename "$EXTRACTED")/bin"
+              fi
+              echo "$mvn_bin" >> "$GITHUB_PATH"
+            fi
+            mvn --version
           fi
-          mvn --version
 
       - name: Set up Rust
         shell: bash
