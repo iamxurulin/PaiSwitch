@@ -109,12 +109,28 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          NSIS_PATH="$(find src-tauri/target/release/bundle/nsis -maxdepth 1 -name '*-setup.exe' -print -quit)"
+          # Debug: list the actual bundle directory structure
+          if [ -d "src-tauri/target/release/bundle" ]; then
+            echo "Bundle directory exists:"
+            find src-tauri/target/release/bundle -type f -name '*.exe' 2>/dev/null || echo "No .exe files found"
+          else
+            echo "Bundle directory does not exist"
+          fi
+          # Try bash find first, then PowerShell as fallback
+          NSIS_PATH="$(find src-tauri/target/release/bundle/nsis -maxdepth 1 -name '*-setup.exe' -print -quit 2>/dev/null || true)"
+          if [ -z "$NSIS_PATH" ]; then
+            # PowerShell fallback
+            NSIS_PATH=$(pwsh -Command '
+              $files = Get-ChildItem "src-tauri/target/release/bundle/nsis" -Filter "*-setup.exe" | Select-Object -First 1 -ExpandProperty FullName
+              if ($files) { Write-Output $files }
+            ' 2>/dev/null || true)
+          fi
           if [ -z "$NSIS_PATH" ]; then
             echo "No .exe installer found" >&2
             exit 1
           fi
           echo "nsis=$NSIS_PATH" >> "$GITHUB_OUTPUT"
+          echo "Found installer: $NSIS_PATH"
 
       - name: Package release assets
         id: assets
