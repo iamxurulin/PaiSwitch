@@ -51,9 +51,28 @@ jobs:
           cache: maven
 
       - name: Set up Maven
-        uses: actions/setup-maven@v5
-        with:
-          maven-version: 3.9.9
+        shell: pwsh
+        run: |
+          $mavenPaths = @(
+            "C:/M/tools/maven/current/bin",
+            "C:/M/tools/maven/latest/bin",
+            "C:/Program Files/Apache/maven/bin",
+            "C:/tools/maven/bin"
+          )
+          $found = $false
+          foreach ($p in $mavenPaths) {
+            if (Test-Path "$p/mvn.cmd") {
+              Write-Host "Found Maven at $p"
+              Add-Content -Path $env:GITHUB_PATH -Value "$p"
+              $found = $true
+              break
+            }
+          }
+          if (-not $found) {
+            Write-Host "Maven not found at known paths, installing via chocolatey..."
+            choco install maven -y --no-progress
+          }
+          mvn --version
 
       - name: Set up Rust
         shell: bash
