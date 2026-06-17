@@ -58,7 +58,12 @@ function run(command, args, options = {}) {
   if (platform() === 'win32') {
     // On Windows, .cmd files require shell mode for argument passing
     // otherwise execFileSync throws EINVAL with non-empty args array
+    // Also wrap paths with spaces in quotes for reliable execution
     opts.shell = true
+    if (args.length > 0) {
+      command = `"${command}" ${args.map(a => a.includes(' ') ? `"${a}"` : a).join(' ')}`
+      args = []
+    }
   }
   execFileSync(command, args, opts)
 }
